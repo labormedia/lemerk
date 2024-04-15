@@ -1,21 +1,12 @@
 use core::ops::Add;
 pub type CipherBlock = [u8;32];
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy, PartialOrd)]
 pub struct Index(usize);
 
 #[derive(Debug, PartialEq)]
 pub enum IndexError {
     IndexOverflow,
-}
-
-pub struct DepthOffset(usize, usize);
-
-impl Add for Index {
-    type Output = Self;
-    fn add(self, other: Self) -> Self {
-        Index(self.get_index() + other.get_index())
-    }
 }
 
 impl Index {
@@ -26,6 +17,17 @@ impl Index {
         self.0
     }
 }
+
+impl Add for Index {
+    type Output = Self;
+    fn add(self, other: Self) -> Self {
+        Index(self.get_index() + other.get_index())
+    }
+}
+
+
+
+pub struct DepthOffset(usize, usize);
 
 impl DepthOffset {
     pub fn new(depth:usize, offset:usize) -> Self {
