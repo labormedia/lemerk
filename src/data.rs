@@ -1,13 +1,9 @@
 use core::ops::Add;
+use crate::error::IndexError;
 pub type CipherBlock = [u8;32];
 
 #[derive(Debug, PartialEq, Clone, Copy, PartialOrd)]
 pub struct Index(usize);
-
-#[derive(Debug, PartialEq)]
-pub enum IndexError {
-    IndexOverflow,
-}
 
 impl Index {
     pub fn from(value: usize) -> Index {
@@ -24,8 +20,6 @@ impl Add for Index {
         Index(self.get_index() + other.get_index())
     }
 }
-
-
 
 pub struct DepthOffset(usize, usize);
 

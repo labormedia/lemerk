@@ -8,10 +8,10 @@ use crate::{
     },
     data::{
         Index,
-        IndexError,
         DepthOffset,
     },
     VirtualNode,
+    error::LeMerkBuilderError,
 };
 
 struct LeMerkBuilder<const BLOCK_SIZE: usize>{
@@ -19,20 +19,6 @@ struct LeMerkBuilder<const BLOCK_SIZE: usize>{
     depth_length: usize,
     // An initial block data to instantiate the merkle tree.
     initial_block: [u8; BLOCK_SIZE],
-}
-
-#[derive(Debug)]
-enum LeMerkBuilderError {
-    Overflow,
-}
-
-impl From<IndexError> for LeMerkBuilderError {
-    fn from(value: IndexError) -> LeMerkBuilderError {
-        match value {
-            IndexError::IndexOverflow => LeMerkBuilderError::Overflow,
-            _ => panic!("Unexpected error"),
-        }
-    }
 }
 
 impl<const BLOCK_SIZE: usize> Default for LeMerkBuilder<BLOCK_SIZE> {
@@ -59,7 +45,7 @@ impl<const BLOCK_SIZE: usize> LeMerkBuilder<BLOCK_SIZE> {
     pub fn try_build(&self) -> Result<LeMerkTree<BLOCK_SIZE>, LeMerkBuilderError>{
         let depth_length = self.depth_length;
         let max_index: Index = DepthOffset::new(depth_length+1,0).try_into()?;
-        let flat_hash_tree: LeMerkLevel<BLOCK_SIZE> = LeMerkLevel::from((0..max_index.get_index()).map(|_| { [0_u8; BLOCK_SIZE] }).collect());
+        let flat_hash_tree: LeMerkLevel<BLOCK_SIZE> = LeMerkLevel::from((0..max_index.get_index()).map(|_| { self.initial_block }).collect());
         Ok(
             LeMerkTree {
                 depth_length,

@@ -10,17 +10,14 @@ use data::{
     CipherBlock,
     Index,
     DepthOffset,
-    IndexError,
 };
+pub mod error;
+use error::*;
 
 // Memory layout for a single layer of blocks. This is used for the expansion of the levels in the builder 
 // and the final flatten expansion of the whole tree, in a single layer indexed by the struct implementation.
 #[derive(PartialEq, Debug)]
 struct LeMerkLevel<const CIPHER_BLOCK_SIZE: usize>(Vec<[u8; CIPHER_BLOCK_SIZE]>);
-
-enum LeMerkLevelError {
-    Overflow,
-}
 
 impl<const CIPHER_BLOCK_SIZE: usize> LeMerkLevel<CIPHER_BLOCK_SIZE> {
     fn get_cipher_block_mut_ref(&mut self, value: Index) -> Result<&mut [u8; CIPHER_BLOCK_SIZE], LeMerkLevelError>{
@@ -55,13 +52,6 @@ struct LeMerkTree<const CIPHER_BLOCK_SIZE: usize> {
     flat_hash_tree: LeMerkLevel<CIPHER_BLOCK_SIZE>,
 }
 
-enum LeMerkTreeError {
-    Overflow,
-    BadDivision,
-    BadMultiplication,
-    BadAddition,
-}
-
 struct VirtualNode<'a, const CIPHER_BLOCK_SIZE: usize> {
     data_hash: &'a mut [u8; CIPHER_BLOCK_SIZE],
     index: Index,
@@ -74,24 +64,15 @@ impl<'a, const CIPHER_BLOCK_SIZE: usize> VirtualNode<'a, CIPHER_BLOCK_SIZE> {
     fn get_index(&self) -> Index {
         self.index
     }
-}
-
-impl From<IndexError> for LeMerkTreeError {
-    fn from(value: IndexError) -> LeMerkTreeError {
-        match value {
-            IndexError::IndexOverflow => LeMerkTreeError::Overflow,
-            _ => panic!("Unexpected error"),
-        }
+    fn get_ancestor(&self) -> Result<Option<Index>, IndexError> {
+        let index = self.index.get_index();
+        let be_ancestor = index.checked_div(2).ok_or(IndexError::IndexBadDivision)?;
+        let ancestor: Option<Index> = if be_ancestor < index { Some(Index::from(be_ancestor)) } else { None };
+        Ok(ancestor)
     }
-}
-
-impl From<LeMerkLevelError> for LeMerkTreeError {
-    fn from(value: LeMerkLevelError) -> LeMerkTreeError {
-        match value {
-            LeMerkLevelError::Overflow => LeMerkTreeError::Overflow,
-            _ => panic!("Unexpected error"),
-        }
-    }
+    fn get_pair_to_ancestor(&self) -> Index {
+        todo!()
+    } 
 }
 
 impl<const CIPHER_BLOCK_SIZE: usize> LeMerkTree<CIPHER_BLOCK_SIZE> {
@@ -102,9 +83,7 @@ impl<const CIPHER_BLOCK_SIZE: usize> LeMerkTree<CIPHER_BLOCK_SIZE> {
     fn get_node_by_index(&mut self, index: Index) -> Result<VirtualNode<CIPHER_BLOCK_SIZE>, LeMerkTreeError> {
         if index > self.max_index { return Err(LeMerkTreeError::Overflow); }
         let be_ancestor = index.get_index().checked_div(2).ok_or(LeMerkTreeError::BadDivision)?;
-        let ancestor: Option<Index> = if be_ancestor < index.get_index() {
-            Some(Index::from(be_ancestor))
-        } else { None };
+        let ancestor: Option<Index> = if be_ancestor < index.get_index() { Some(Index::from(be_ancestor)) } else { None };
         let be_right = index.get_index()
             .checked_mul(2)
             .ok_or(LeMerkTreeError::BadMultiplication)?
@@ -113,7 +92,7 @@ impl<const CIPHER_BLOCK_SIZE: usize> LeMerkTree<CIPHER_BLOCK_SIZE> {
         let right: Option<Index> = if be_right <= self.max_index.get_index() {
             Some(Index::from(be_right))
         } else { None };
-        let left: Option<Index> = if right != None {
+        let left: Option<Index> = if right != None { // left is always strictly less than right in this scope, then we can have guarantees that when right is not None left should be Some(value).
             Some(
                 Index::from(
                     index.get_index()
