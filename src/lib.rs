@@ -56,8 +56,8 @@ struct VirtualNode<'a, const CIPHER_BLOCK_SIZE: usize> {
     data_hash: &'a mut [u8; CIPHER_BLOCK_SIZE],
     index: Index,
     ancestor: Option<Index>,
-    left: Option<Index>,
-    right: Option<Index>
+    left_successor: Option<Index>,
+    right_successor: Option<Index>
 }
 
 impl<'a, const CIPHER_BLOCK_SIZE: usize> VirtualNode<'a, CIPHER_BLOCK_SIZE> {
@@ -89,10 +89,10 @@ impl<const CIPHER_BLOCK_SIZE: usize> LeMerkTree<CIPHER_BLOCK_SIZE> {
             .ok_or(LeMerkTreeError::BadMultiplication)?
             .checked_add(1)
             .ok_or(LeMerkTreeError::BadAddition)?;
-        let right: Option<Index> = if be_right <= self.max_index.get_index() {
+        let right_successor: Option<Index> = if be_right <= self.max_index.get_index() {
             Some(Index::from(be_right))
         } else { None };
-        let left: Option<Index> = if right != None { // left is always strictly less than right in this scope, then we can have guarantees that when right is not None left should be Some(value).
+        let left_successor: Option<Index> = if right_successor != None { // left is always strictly less than right in this scope, then we can have guarantees that when right is not None left should be Some(value).
             Some(
                 Index::from(
                     index.get_index()
@@ -106,8 +106,8 @@ impl<const CIPHER_BLOCK_SIZE: usize> LeMerkTree<CIPHER_BLOCK_SIZE> {
                 data_hash: self.flat_hash_tree.get_cipher_block_mut_ref(index)?,
                 index,
                 ancestor,
-                left,
-                right,
+                left_successor,
+                right_successor,
             }
         )
     }
