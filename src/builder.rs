@@ -11,6 +11,7 @@ use crate::{
         IndexError,
         DepthOffset,
     },
+    VirtualNode,
 };
 
 struct LeMerkBuilder<const BLOCK_SIZE: usize>{
