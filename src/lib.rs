@@ -1,7 +1,9 @@
 /// LeMerk is a custom Merkle Tree implemention.
+use sha3;
 use core::iter::Iterator;
 // Crypto helpers.
 mod crypto;
+use crypto::hash_visit;
 // LeMerk tree builder pattern.
 pub mod builder;
 // Tree data elements
@@ -16,7 +18,7 @@ use error::*;
 
 // Memory layout for a single layer of blocks. This is used for the expansion of the levels in the builder 
 // and the final flatten expansion of the whole tree, in a single layer indexed by the struct implementation.
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 struct LeMerkLevel<const CIPHER_BLOCK_SIZE: usize>(Vec<[u8; CIPHER_BLOCK_SIZE]>);
 
 impl<const CIPHER_BLOCK_SIZE: usize> LeMerkLevel<CIPHER_BLOCK_SIZE> {
@@ -28,8 +30,8 @@ impl<const CIPHER_BLOCK_SIZE: usize> LeMerkLevel<CIPHER_BLOCK_SIZE> {
             Err(LeMerkLevelError::Overflow)
         }
     }
-    fn get_cipher_block(&self, value: Index) -> Result<[u8; CIPHER_BLOCK_SIZE], LeMerkLevelError>{
-        let index_usize = value.get_index();
+    fn get_cipher_block(&self, index: Index) -> Result<[u8; CIPHER_BLOCK_SIZE], LeMerkLevelError>{
+        let index_usize = index.get_index();
         if index_usize < self.0.len() {
             Ok(self.0[index_usize])
         } else {
@@ -39,6 +41,40 @@ impl<const CIPHER_BLOCK_SIZE: usize> LeMerkLevel<CIPHER_BLOCK_SIZE> {
     fn from(vector: Vec<[u8; CIPHER_BLOCK_SIZE]>) -> LeMerkLevel<CIPHER_BLOCK_SIZE> {
         LeMerkLevel::<CIPHER_BLOCK_SIZE>(vector)
     }
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+
+}
+
+impl<const CIPHER_BLOCK_SIZE: usize> Iterator for LeMerkLevel<CIPHER_BLOCK_SIZE> {
+    type Item = LeMerkLevel<CIPHER_BLOCK_SIZE>;
+    fn next(&mut self) -> Option<LeMerkLevel<CIPHER_BLOCK_SIZE>> {
+        let level_length = self.len();
+        if level_length.checked_rem(2) == Some(1) {
+            None
+        } else {
+            Some(LeMerkLevel::<CIPHER_BLOCK_SIZE>::from(
+                (0..level_length.checked_div(2)?)
+                    .map(|i| Index::from(i))
+                    .map(|i| { 
+                        let a = self.get_cipher_block(i).unwrap(); // TODO : make this unwrap infallible
+                        let b = self.get_cipher_block(i+Index::from(1)).unwrap();
+                        let mut output = [0_u8; CIPHER_BLOCK_SIZE];
+                        hash_visit::<sha3::Sha3_256>(&a,&b, &mut output);
+                        output
+                    }) 
+                    .collect()
+            ))
+        }
+    }
+    // fn fold<B, F>(self, init: B, f: F) -> B
+    // where
+    //     Self: Sized,
+    //     F: FnMut(B, Self::Item) -> B
+    // {
+    //     init
+    // }
 }
 
 // Memory layout for a LeMerk Tree.
