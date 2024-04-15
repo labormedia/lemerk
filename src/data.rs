@@ -1,3 +1,4 @@
+use core::ops::Add;
 pub type CipherBlock = [u8;32];
 
 #[derive(Debug, PartialEq)]
@@ -8,7 +9,29 @@ pub enum IndexError {
     IndexOverflow,
 }
 
-struct DepthOffset(usize, usize);
+pub struct DepthOffset(usize, usize);
+
+impl Add for Index {
+    type Output = Self;
+    fn add(self, other: Self) -> Self {
+        Index(self.get_index() + other.get_index())
+    }
+}
+
+impl Index {
+    pub fn from(value: usize) -> Index {
+        Index(value)
+    }
+    pub fn get_index(&self) -> usize {
+        self.0
+    }
+}
+
+impl DepthOffset {
+    pub fn new(depth:usize, offset:usize) -> Self {
+        DepthOffset(depth, offset)
+    }
+}
 
 impl From<(usize, usize)> for DepthOffset {
     fn from(value: (usize, usize)) -> DepthOffset {
