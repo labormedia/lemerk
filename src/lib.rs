@@ -15,6 +15,7 @@ use data::{
 
 // Memory layout for a single layer of blocks. This is used for the expansion of the levels in the builder 
 // and the final flatten expansion of the whole tree, in a single layer indexed by the struct implementation.
+#[derive(PartialEq, Debug)]
 struct LeMerkLevel<const CIPHER_BLOCK_SIZE: usize>(Vec<[u8; CIPHER_BLOCK_SIZE]>);
 
 enum LeMerkLevelError {
@@ -30,14 +31,16 @@ impl<const CIPHER_BLOCK_SIZE: usize> LeMerkLevel<CIPHER_BLOCK_SIZE> {
             Err(LeMerkLevelError::Overflow)
         }
     }
+    fn from(vector: Vec<[u8; CIPHER_BLOCK_SIZE]>) -> LeMerkLevel<CIPHER_BLOCK_SIZE> {
+        LeMerkLevel::<CIPHER_BLOCK_SIZE>(vector)
+    }
 }
 
 // Memory layout for a LeMerk Tree.
+#[derive(PartialEq, Debug)]
 struct LeMerkTree<const CIPHER_BLOCK_SIZE: usize> {
     // Level's length of the Merkle Tree.
     depth_length: usize,
-    // Cipher block size in bytes.
-    block_size: usize,
     // Maximum possible Index
     max_index: Index,
     // A flatten representation of the whole tree.
