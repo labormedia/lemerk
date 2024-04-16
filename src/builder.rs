@@ -1,3 +1,4 @@
+use sha3;
 use hex_literal::hex;
 use crate::{
     LeMerkTree,
@@ -38,11 +39,19 @@ impl<const BLOCK_SIZE: usize> LeMerkBuilder<BLOCK_SIZE> {
         self.max_depth = max_depth;
         self
     }
+    pub fn with_depth_length(mut self, depth_length: usize) -> Self {
+        if depth_length > 0 {
+            self.max_depth = depth_length - 1;
+        } else {
+            self.max_depth = 0;
+        };
+        self
+    }
     pub fn with_initial_block(mut self, initial_block: [u8;BLOCK_SIZE]) -> Self {
         self.initial_block = initial_block;
         self
     }
-    pub fn try_build(&self) -> Result<LeMerkTree<BLOCK_SIZE>, LeMerkBuilderError>{
+    pub fn try_build<D: sha3::Digest>(&self) -> Result<LeMerkTree<BLOCK_SIZE>, LeMerkBuilderError>{
         let max_depth = self.max_depth;
         let hash_tree_data_length: Index = Index::try_from(DepthOffset::from((max_depth+1,0)))?;
         let max_index: Index = Index::from(hash_tree_data_length.get_index() - 1);
@@ -60,7 +69,7 @@ impl<const BLOCK_SIZE: usize> LeMerkBuilder<BLOCK_SIZE> {
                 })
                 .collect();
             initial_index += allocation_size;
-            hash_visit::<sha3::Sha3_256>(&allocating_block, &allocating_block, &mut allocating_block_buffer);
+            hash_visit::<D>(&allocating_block, &allocating_block, &mut allocating_block_buffer);
         };
         let flat_hash_tree: LeMerkLevel<BLOCK_SIZE> = LeMerkLevel::from(hash_tree_data);
         Ok(
@@ -99,7 +108,7 @@ fn build_zero_merkletree() {
     let tree: LeMerkTree<SIZE> = builder
         .with_max_depth(0)
         .with_initial_block([0_u8;SIZE])
-        .try_build()
+        .try_build::<sha3::Sha3_256>()
         .expect("Unexpected build.");
     assert_eq!(
         tree,
@@ -118,7 +127,7 @@ fn build_initial_value_merkletree() {
     let tree: LeMerkTree<SIZE> = builder
         .with_max_depth(1)
         .with_initial_block(hex!("abababababababababababababababababababababababababababababababab"))
-        .try_build()
+        .try_build::<sha3::Sha3_256>()
         .expect("Unexpected build.");
     assert_eq!(
         tree,
@@ -145,9 +154,9 @@ fn build_merkletree_depth_20() {
     const SIZE: usize = 32;
     let mut builder: LeMerkBuilder<SIZE> = LeMerkBuilder::<SIZE>::new();
     let tree: LeMerkTree<SIZE> = builder
-        .with_max_depth(19)
+        .with_depth_length(20)
         .with_initial_block(hex!("abababababababababababababababababababababababababababababababab"))
-        .try_build()
+        .try_build::<sha3::Sha3_256>()
         .expect("Unexpected build.");
     assert_eq!(
         tree.get_root().unwrap(),
