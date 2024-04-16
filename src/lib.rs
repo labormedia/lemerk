@@ -1,5 +1,6 @@
 /// LeMerk is a custom Merkle Tree implemention.
 use sha3;
+use hex_literal::hex;
 use core::iter::Iterator;
 // Crypto helpers.
 mod crypto;
@@ -90,7 +91,9 @@ struct LeMerkTree<const CIPHER_BLOCK_SIZE: usize> {
 
 struct VirtualNode<'a, const CIPHER_BLOCK_SIZE: usize> {
     data_hash: &'a mut [u8; CIPHER_BLOCK_SIZE],
+    // Zero based index. This is designed to be implemented for a flat_hash_tree as LeMerkLevel representation of an entire tree.
     index: Index,
+    // Option wrapping the index of the ancestor, None if there's no ancestor (root). 
     ancestor: Option<Index>,
     left_successor: Option<Index>,
     right_successor: Option<Index>
@@ -106,8 +109,17 @@ impl<'a, const CIPHER_BLOCK_SIZE: usize> VirtualNode<'a, CIPHER_BLOCK_SIZE> {
         let ancestor: Option<Index> = if be_ancestor < index { Some(Index::from(be_ancestor)) } else { None };
         Ok(ancestor)
     }
-    fn get_pair_to_ancestor(&self) -> Index {
-        todo!()
+    fn get_pair_to_ancestor(&self) -> Result<Option<Index>, IndexError> {
+        if let remainder = self.get_index().checked_rem(2)? {
+            assert!(remainder.get_index() == 1_usize);
+            Ok(Some(self.get_index().try_decr()?))
+        } else {
+            if self.get_index() == Index::from(0) { // Index 
+                Ok(None)
+            } else {
+                Ok(Some(self.get_index().incr()))
+            }
+        }
     } 
 }
 
@@ -203,5 +215,20 @@ fn next_level_depth_2() {
             ].to_vec()
         ), 
         root
+    );
+}
+
+#[test]
+fn build_merkletree_depth_20() {
+    const SIZE: usize = 32;
+    let mut builder: builder::LeMerkBuilder<SIZE> = builder::LeMerkBuilder::<SIZE>::new();
+    let tree: LeMerkTree<SIZE> = builder
+        .with_depth_length(20)
+        .with_initial_block(hex!("abababababababababababababababababababababababababababababababab"))
+        .try_build::<sha3::Sha3_256>()
+        .expect("Unexpected build.");
+    assert_eq!(
+        tree.get_root().unwrap(),
+        hex!("d4490f4d374ca8a44685fe9471c5b8dbe58cdffd13d30d9aba15dd29efb92930"), 
     );
 }

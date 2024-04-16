@@ -15,6 +15,12 @@ impl Index {
     pub fn incr(self) -> Index {
         self + Index::from(1)
     }
+    pub fn try_decr(self) -> Result<Index, IndexError> {
+        Ok(Index::from(self.get_index().checked_sub(1).ok_or(IndexError::IndexBadSubstraction)?) )
+    }
+    pub fn checked_rem(&self, value: usize) -> Result<Index, IndexError> {
+        Ok(Index::from(self.get_index().checked_rem(value).ok_or(IndexError::IndexBadRemainder)?))
+    }
 }
 
 impl Add for Index {
