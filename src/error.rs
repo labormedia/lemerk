@@ -3,11 +3,13 @@ pub enum LeMerkLevelError {
     Overflow,
 }
 
+#[derive(Debug)]
 pub enum LeMerkTreeError {
     Overflow,
     BadDivision,
     BadMultiplication,
     BadAddition,
+    BadPow,
 }
 
 pub enum VirtualNodeError {
@@ -52,6 +54,7 @@ pub enum LeMerkBuilderError {
     BadDivision,
     BadMultiplication,
     BadAddition,
+    BadPow,
 }
 
 impl From<IndexError> for LeMerkBuilderError {

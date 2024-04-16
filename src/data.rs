@@ -12,6 +12,9 @@ impl Index {
     pub fn get_index(&self) -> usize {
         self.0
     }
+    pub fn incr(self) -> Index {
+        self + Index::from(1)
+    }
 }
 
 impl Add for Index {

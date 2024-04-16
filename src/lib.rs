@@ -56,12 +56,12 @@ impl<const CIPHER_BLOCK_SIZE: usize> Iterator for LeMerkLevel<CIPHER_BLOCK_SIZE>
         } else {
             Some(LeMerkLevel::<CIPHER_BLOCK_SIZE>::from(
                 (0..level_length.checked_div(2)?)
-                    .map(|i| Index::from(i))
+                    .map(|i| Index::from(i*2))
                     .map(|i| { 
-                        let a = self.get_cipher_block(i).unwrap(); // TODO : make this unwrap infallible
-                        let b = self.get_cipher_block(i+Index::from(1)).unwrap();
+                        let left = self.get_cipher_block(i).unwrap(); // TODO : make this unwrap infallible
+                        let right = self.get_cipher_block(i.incr()).unwrap();
                         let mut output = [0_u8; CIPHER_BLOCK_SIZE];
-                        hash_visit::<sha3::Sha3_256>(&a,&b, &mut output);
+                        hash_visit::<sha3::Sha3_256>(&left,&right, &mut output);
                         output
                     }) 
                     .collect()
@@ -81,7 +81,7 @@ impl<const CIPHER_BLOCK_SIZE: usize> Iterator for LeMerkLevel<CIPHER_BLOCK_SIZE>
 #[derive(PartialEq, Debug)]
 struct LeMerkTree<const CIPHER_BLOCK_SIZE: usize> {
     // Level's length of the Merkle Tree.
-    depth_length: usize,
+    max_depth: usize,
     // Maximum possible Index
     max_index: Index,
     // A flatten representation of the whole tree.
@@ -147,4 +147,61 @@ impl<const CIPHER_BLOCK_SIZE: usize> LeMerkTree<CIPHER_BLOCK_SIZE> {
             }
         )
     }
+    fn get_level_by_depth(&mut self, depth: usize) -> Result<LeMerkLevel<CIPHER_BLOCK_SIZE>, LeMerkTreeError> {
+        if depth > self.max_depth {
+            Err(LeMerkTreeError::Overflow)
+        } else {
+            let level_size = 2_usize.checked_pow(depth as u32).ok_or(LeMerkTreeError::BadPow)?;
+            let initial_index = level_size-1;
+            let ending_index = initial_index + level_size;
+            Ok(LeMerkLevel::from(
+                self.flat_hash_tree.0[initial_index..ending_index].to_vec()
+            ))
+        }
+    }
+    fn get_root(&self) -> Result<[u8; CIPHER_BLOCK_SIZE], LeMerkTreeError> {
+        Ok(self.flat_hash_tree.get_cipher_block(self.max_index)?)
+    }
+    // Calculates the node's values in place.
+    fn recalculate(&mut self) {
+
+    }
+}
+
+#[test]
+fn next_level_depth_1() {
+    const SIZE: usize = 32;
+    let mut level: LeMerkLevel<SIZE> = LeMerkLevel::from(vec![[0_u8;SIZE]; 2]);
+    let next_level = level.next().expect("Wrong assumptions.");
+    assert_eq!(
+        LeMerkLevel::from(
+            [[7, 15, 161, 171, 111, 204, 85, 126, 209, 77, 66, 148, 31, 25, 103, 105, 48, 72, 85, 30, 185, 4, 42, 141, 10, 5, 122, 251, 215, 94, 129, 224]].to_vec()
+        ), 
+        next_level
+    );
+}
+
+#[test]
+fn next_level_depth_2() {
+    const SIZE: usize = 32;
+    let mut level: LeMerkLevel<SIZE> = LeMerkLevel::from(vec![[0_u8;SIZE]; 4]);
+    let mut next_level = level.next().expect("Wrong assumptions.");
+    let root = next_level.next().expect("Wrong assumptions.");
+    assert_eq!(
+        LeMerkLevel::from(
+            [
+                [7, 15, 161, 171, 111, 204, 85, 126, 209, 77, 66, 148, 31, 25, 103, 105, 48, 72, 85, 30, 185, 4, 42, 141, 10, 5, 122, 251, 215, 94, 129, 224],
+                [7, 15, 161, 171, 111, 204, 85, 126, 209, 77, 66, 148, 31, 25, 103, 105, 48, 72, 85, 30, 185, 4, 42, 141, 10, 5, 122, 251, 215, 94, 129, 224]
+            ].to_vec()
+        ), 
+        next_level
+    );
+    assert_eq!(
+        LeMerkLevel::from(
+            [
+                [83, 218, 176, 66, 48, 138, 183, 1, 176, 115, 237, 212, 209, 76, 86, 84, 161, 247, 13, 33, 11, 103, 14, 242, 136, 201, 174, 234, 156, 74, 69, 48]
+            ].to_vec()
+        ), 
+        root
+    );
 }
