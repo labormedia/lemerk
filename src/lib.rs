@@ -159,7 +159,7 @@ impl<const CIPHER_BLOCK_SIZE: usize> LeMerkTree<CIPHER_BLOCK_SIZE> {
             }
         )
     }
-    fn get_level_by_depth(&mut self, depth: usize) -> Result<LeMerkLevel<CIPHER_BLOCK_SIZE>, LeMerkTreeError> {
+    fn get_level_by_depth_index(&mut self, depth: usize) -> Result<LeMerkLevel<CIPHER_BLOCK_SIZE>, LeMerkTreeError> {
         let max_index = self.max_index.get_index();
         if depth > self.max_depth {
             Err(LeMerkTreeError::Overflow)
@@ -232,13 +232,13 @@ fn merkletree_depth_20_levels_0_1() {
         tree.get_root().unwrap(),
         hex!("d4490f4d374ca8a44685fe9471c5b8dbe58cdffd13d30d9aba15dd29efb92930"), 
     );
-    let mut level_0 = tree.get_level_by_depth(0).unwrap();
+    let mut level_0 = tree.get_level_by_depth_index(0).unwrap();
     assert!(level_0.len() == 1);
     assert_eq!(
         level_0.get_cipher_block_mut_ref(Index::from(0)).unwrap(),
         &mut hex!("d4490f4d374ca8a44685fe9471c5b8dbe58cdffd13d30d9aba15dd29efb92930"),
     );
-    let mut level_1 = tree.get_level_by_depth(1).unwrap();
+    let mut level_1 = tree.get_level_by_depth_index(1).unwrap();
     assert_eq!(level_1.len(), 2);
     let left = level_1.get_cipher_block(Index::from(0)).unwrap();
     let right = level_1.get_cipher_block(Index::from(1)).unwrap();
@@ -256,4 +256,17 @@ fn merkletree_depth_20_levels_0_1() {
         output,
         hex!("d4490f4d374ca8a44685fe9471c5b8dbe58cdffd13d30d9aba15dd29efb92930")
     )
+}
+
+#[test]
+#[should_panic]
+fn get_level_greater_than_max_level_should_fail() {
+    const SIZE: usize = 32;
+    let mut builder: builder::LeMerkBuilder<SIZE> = builder::LeMerkBuilder::<SIZE>::new();
+    let mut tree: LeMerkTree<SIZE> = builder
+        .with_depth_length(20)
+        .with_initial_block(hex!("abababababababababababababababababababababababababababababababab"))
+        .try_build::<sha3::Sha3_256>()
+        .expect("Unexpected build.");
+    let mut level_1 = tree.get_level_by_depth_index(20).unwrap();  // Max depth index for a LeMerkTree of depth length K is (K - 1).
 }
