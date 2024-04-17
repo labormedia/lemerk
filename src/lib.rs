@@ -260,7 +260,7 @@ fn merkletree_depth_20_levels_0_1() {
 
 #[test]
 #[should_panic]
-fn get_level_greater_than_max_level_should_fail() {
+fn get_level_by_depth_index_greater_than_max_depth_index_should_fail() {
     const SIZE: usize = 32;
     let mut builder: builder::LeMerkBuilder<SIZE> = builder::LeMerkBuilder::<SIZE>::new();
     let mut tree: LeMerkTree<SIZE> = builder
