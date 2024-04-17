@@ -45,7 +45,6 @@ impl<const CIPHER_BLOCK_SIZE: usize> LeMerkLevel<CIPHER_BLOCK_SIZE> {
     fn len(&self) -> usize {
         self.0.len()
     }
-
 }
 
 impl<const CIPHER_BLOCK_SIZE: usize> Iterator for LeMerkLevel<CIPHER_BLOCK_SIZE> {
@@ -259,6 +258,34 @@ fn merkletree_depth_20_levels_0_1() {
 }
 
 #[test]
+fn get_lastand_pre_last_levels_from_tree_depth_20() {
+    const SIZE: usize = 32;
+    let tree_depth_length = 20;
+    let last_level_depth_index = 19;
+    let pre_last_level_depth_index = 18;
+    let mut builder: builder::LeMerkBuilder<SIZE> = builder::LeMerkBuilder::<SIZE>::new();
+    let mut tree: LeMerkTree<SIZE> = builder
+        .with_depth_length(tree_depth_length)
+        .with_initial_block(hex!("abababababababababababababababababababababababababababababababab"))
+        .try_build::<sha3::Sha3_256>()
+        .expect("Unexpected build.");
+    let mut pre_last_level = tree.get_level_by_depth_index(pre_last_level_depth_index).unwrap();
+    let mut last_level = tree.get_level_by_depth_index(last_level_depth_index).unwrap();  // Max depth index for a LeMerkTree of depth length K is (K - 1).
+    assert_eq!(
+        pre_last_level.len(),
+        2_usize.pow(pre_last_level_depth_index as u32)
+    );
+    assert_eq!(
+        last_level.len(),
+        2_usize.pow(last_level_depth_index as u32)
+    );
+    let next_to_last_level = last_level.clone().next().unwrap();
+    assert_eq!(pre_last_level, next_to_last_level);
+    assert_eq!(last_level, LeMerkLevel::from(vec![hex!("abababababababababababababababababababababababababababababababab");2_usize.pow(last_level_depth_index as u32)]));
+    assert_ne!(last_level, LeMerkLevel::from(vec![hex!("ababababababaffbabababababababababababababababababababababababab");2_usize.pow(last_level_depth_index as u32)]));
+}
+
+#[test]
 #[should_panic]
 fn get_level_by_depth_index_greater_than_max_depth_index_should_fail() {
     const SIZE: usize = 32;
@@ -268,5 +295,5 @@ fn get_level_by_depth_index_greater_than_max_depth_index_should_fail() {
         .with_initial_block(hex!("abababababababababababababababababababababababababababababababab"))
         .try_build::<sha3::Sha3_256>()
         .expect("Unexpected build.");
-    let mut level_1 = tree.get_level_by_depth_index(20).unwrap();  // Max depth index for a LeMerkTree of depth length K is (K - 1).
+    let mut level_20 = tree.get_level_by_depth_index(20).unwrap();  // Max depth index for a LeMerkTree of depth length K is (K - 1).
 }
