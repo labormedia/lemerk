@@ -160,11 +160,12 @@ impl<const CIPHER_BLOCK_SIZE: usize> LeMerkTree<CIPHER_BLOCK_SIZE> {
         )
     }
     fn get_level_by_depth(&mut self, depth: usize) -> Result<LeMerkLevel<CIPHER_BLOCK_SIZE>, LeMerkTreeError> {
+        let max_index = self.max_index.get_index();
         if depth > self.max_depth {
             Err(LeMerkTreeError::Overflow)
         } else {
+            let initial_index = max_index + 1 - 2_usize.checked_pow(depth as u32 + 1).ok_or(LeMerkTreeError::BadPow)?.checked_sub(1).ok_or(LeMerkTreeError::BadSubstraction)?;
             let level_size = 2_usize.checked_pow(depth as u32).ok_or(LeMerkTreeError::BadPow)?;
-            let initial_index = level_size-1;
             let ending_index = initial_index + level_size;
             Ok(LeMerkLevel::from(
                 self.flat_hash_tree.0[initial_index..ending_index].to_vec()
@@ -176,7 +177,7 @@ impl<const CIPHER_BLOCK_SIZE: usize> LeMerkTree<CIPHER_BLOCK_SIZE> {
     }
     // Calculates the node's values in place.
     fn recalculate(&mut self) {
-
+        todo!()
     }
 }
 
@@ -219,10 +220,10 @@ fn next_level_depth_2() {
 }
 
 #[test]
-fn build_merkletree_depth_20() {
+fn merkletree_depth_20_levels_0_1() {
     const SIZE: usize = 32;
     let mut builder: builder::LeMerkBuilder<SIZE> = builder::LeMerkBuilder::<SIZE>::new();
-    let tree: LeMerkTree<SIZE> = builder
+    let mut tree: LeMerkTree<SIZE> = builder
         .with_depth_length(20)
         .with_initial_block(hex!("abababababababababababababababababababababababababababababababab"))
         .try_build::<sha3::Sha3_256>()
@@ -231,4 +232,28 @@ fn build_merkletree_depth_20() {
         tree.get_root().unwrap(),
         hex!("d4490f4d374ca8a44685fe9471c5b8dbe58cdffd13d30d9aba15dd29efb92930"), 
     );
+    let mut level_0 = tree.get_level_by_depth(0).unwrap();
+    assert!(level_0.len() == 1);
+    assert_eq!(
+        level_0.get_cipher_block_mut_ref(Index::from(0)).unwrap(),
+        &mut hex!("d4490f4d374ca8a44685fe9471c5b8dbe58cdffd13d30d9aba15dd29efb92930"),
+    );
+    let mut level_1 = tree.get_level_by_depth(1).unwrap();
+    assert_eq!(level_1.len(), 2);
+    let left = level_1.get_cipher_block(Index::from(0)).unwrap();
+    let right = level_1.get_cipher_block(Index::from(1)).unwrap();
+    assert_eq!(
+        left,
+        [244_u8, 96, 234, 249, 100, 250, 60, 212, 18, 150, 230, 14, 253, 191, 109, 215, 223, 84, 156, 120, 12, 63, 185, 67, 46, 23, 132, 168, 157, 248, 67, 2],
+    );
+    assert_eq!(
+        right,
+        [244_u8, 96, 234, 249, 100, 250, 60, 212, 18, 150, 230, 14, 253, 191, 109, 215, 223, 84, 156, 120, 12, 63, 185, 67, 46, 23, 132, 168, 157, 248, 67, 2],
+    );
+    let mut output = [0_u8; SIZE];
+    hash_visit::<sha3::Sha3_256>(&left, &right, &mut output);
+    assert_eq!(
+        output,
+        hex!("d4490f4d374ca8a44685fe9471c5b8dbe58cdffd13d30d9aba15dd29efb92930")
+    )
 }

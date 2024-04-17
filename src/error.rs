@@ -9,6 +9,7 @@ pub enum LeMerkTreeError {
     BadDivision,
     BadMultiplication,
     BadAddition,
+    BadSubstraction,
     BadPow,
 }
 
