@@ -49,22 +49,33 @@ impl TryFrom<Index> for DepthOffset {
     // Unless value > 9223372036854775806.
     fn try_from(value: Index) -> Result<DepthOffset, Self::Error> {
         let value = value.get_index();
-        if value > 9223372036854775806 { return Err(IndexError::IndexOverflow) };
-        let mut i: u32 = 0;
-        let mut acc: usize = 2_usize
-            .checked_pow(i+1).ok_or(IndexError::IndexBadPow)?
-            .checked_sub(1).ok_or(IndexError::IndexBadSubstraction)?;
-        while value >= acc {
-            i +=1;
-            acc = 2_usize
+        if value < 9223372036854775806 { // The last possible level under usize precision is 63
+            let mut i: u32 = 0;
+            let mut acc: usize = 2_usize
                 .checked_pow(i+1).ok_or(IndexError::IndexBadPow)?
                 .checked_sub(1).ok_or(IndexError::IndexBadSubstraction)?;
-        };
-        let prev = 2_usize
-            .checked_pow(i).ok_or(IndexError::IndexBadPow)?
-            .checked_sub(1).ok_or(IndexError::IndexBadSubstraction)?;
-        println!("i {}, value {}, acc {}, prev {}", i, value, acc, prev);
-        Ok(DepthOffset::from((i as usize, value-prev)))
+            while value >= acc {
+                i +=1;
+                acc = 2_usize
+                    .checked_pow(i+1).ok_or(
+                        IndexError::IndexBadPow
+                    )?
+                    .checked_sub(1).ok_or(IndexError::IndexBadSubstraction)?;
+            };
+            let prev = 2_usize
+                .checked_pow(i).ok_or(IndexError::IndexBadPow)?
+                .checked_sub(1).ok_or(IndexError::IndexBadSubstraction)?;
+            Ok(DepthOffset::from((i as usize, value-prev)))
+        } else if value == 9223372036854775807 {
+            Ok(DepthOffset::from((63, 0)))
+        } else {
+            let closest_log2 = value.ilog2();
+            let previous_layers_cardinality: usize = 2_usize
+                .checked_pow(closest_log2).ok_or(IndexError::IndexBadPow)?
+                .checked_sub(1).ok_or(IndexError::IndexBadSubstraction)?;
+            Ok(DepthOffset::from((closest_log2 as usize, value-previous_layers_cardinality)))
+        }
+
     }
 }
 
@@ -78,6 +89,9 @@ impl TryFrom<DepthOffset> for Index {
     type Error = IndexError;
     fn try_from(value: DepthOffset) -> Result<Index, Self::Error> {
         let DepthOffset(depth, offset) = value;
+        if depth > 63 || (depth == 63 && offset > 9223372036854775808) {
+            return Err(IndexError::IndexOverflow);
+        };
         Ok(Index(
             2_usize
             .checked_pow(depth as u32).ok_or(Self::Error::IndexOverflow)?
@@ -111,13 +125,13 @@ fn half_usize() {
 }
 
 #[test]
-fn try_from_depthoffset_max() {
-    assert_eq!(Index::try_from((63,9223372036854775807 + 1)), Ok(Index(usize::MAX)));
+fn try_from_depthoffset_63_9223372036854775808() {
+    assert_eq!(Index::try_from((63,9223372036854775808)).unwrap(), Index::from(usize::MAX));
 }
 
 #[test]
 fn try_from_one_more_than_max() {
-    assert_eq!(Index::try_from((63,9223372036854775807 + 2)).unwrap_err(), IndexError::IndexOverflow);
+    assert_eq!(Index::try_from((63,9223372036854775808 + 1)).unwrap_err(), IndexError::IndexOverflow);
 }
 
 #[test]
@@ -152,6 +166,14 @@ fn try_from_index_to_depthoffset() {
         ).unwrap(), 
         DepthOffset::new(62,4611686018427387903)
     );
+    assert_eq!(
+        DepthOffset::try_from(
+            Index::from(
+                usize::MAX
+            )
+        ).unwrap(), 
+        DepthOffset::new(63,9223372036854775808)
+    );
 }
 
 #[test]
@@ -159,16 +181,51 @@ fn max_index_value_is_9223372036854775806() {
     assert_eq!(
         DepthOffset::try_from(Index::from(9223372036854775806)).unwrap()
         , 
-        DepthOffset(62, 4611686018427387903)
+        DepthOffset::new(62, 4611686018427387903)
     );
 }
 
+// These tests have been shortened for convenience.
 #[test]
-#[should_panic(expected = "IndexOverflow")]
-fn index_value_9223372036854775807_is_invalid() {
-    assert_eq!(
-        DepthOffset::try_from(Index::from(9223372036854775807)).unwrap()
-        , 
-        DepthOffset(62, 4611686018427387904)
-    );
+fn index_greater_than_9223372036854775806_are_valid() {
+    let _: Vec<_> = (9223372036854775807..=9223372036854775807+100)
+        .enumerate()
+        .map( |(i,x)| {
+            assert_eq!(
+                DepthOffset::try_from(Index::from(x)).unwrap()
+                , 
+                DepthOffset::new(63, i)
+            );
+        })
+        .collect();
+}
+
+#[test]
+fn depthoffset_index_symmetry_small() {
+    let x: usize = 0;
+    let n_tests = 10000;
+    let _: Vec<_> = (9223372036854775807..=9223372036854775807+n_tests)
+        .enumerate()
+        .map( |(i,x)| {
+            assert_eq!(
+                Index::from(x), 
+                Index::try_from(DepthOffset::try_from(Index::from(x)).unwrap()).unwrap()
+            );
+        })
+        .collect();
+}
+
+#[test]
+fn depthoffset_index_symmetry_big() {
+    let x: usize = 9223372036854775807;
+    let n_tests = 10000;
+    let _: Vec<_> = (9223372036854775807..=9223372036854775807+n_tests)
+        .enumerate()
+        .map( |(i,x)| {
+            assert_eq!(
+                Index::from(x), 
+                Index::try_from(DepthOffset::try_from(Index::from(x)).unwrap()).unwrap()
+            );
+        })
+        .collect();
 }
