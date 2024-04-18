@@ -69,7 +69,7 @@ impl TryFrom<Index> for DepthOffset {
         } else if value == 9223372036854775807 {
             Ok(DepthOffset::from((63, 0)))
         } else {
-            let closest_log2 = value.ilog2();
+            let closest_log2 = value.checked_ilog(2).ok_or(IndexError::IndexBadilog)?;
             let previous_layers_cardinality: usize = 2_usize
                 .checked_pow(closest_log2).ok_or(IndexError::IndexBadPow)?
                 .checked_sub(1).ok_or(IndexError::IndexBadSubstraction)?;

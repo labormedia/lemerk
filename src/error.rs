@@ -50,6 +50,7 @@ pub enum IndexError {
     IndexBadSubstraction,
     IndexBadRemainder,
     IndexBadPow,
+    IndexBadilog,
 }
 
 #[derive(Debug)]
