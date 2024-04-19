@@ -1,5 +1,8 @@
 use core::ops::Add;
-use crate::error::IndexError;
+use crate::{
+    error::IndexError,
+    traits::SizedTree,
+};
 pub type CipherBlock = [u8;32];
 
 #[derive(Debug, PartialEq, Clone, Copy, PartialOrd)]
@@ -24,6 +27,34 @@ impl Index {
     pub fn checked_rem(&self, value: usize) -> Result<Index, IndexError> {
         Ok(Index::from(self.get_index().checked_rem(value).ok_or(IndexError::IndexBadRemainder)?))
     }
+    pub fn to_flat_hash_tree_index<ST: SizedTree>(&self, tree: ST) -> Option<usize> {
+        let max_index = tree.get_max_index();
+        if self.get_index() > max_index {
+            None
+        } else {
+            let depth_offset = DepthOffset::try_from(self.clone()).ok()?;
+            let depth = depth_offset.get_depth();
+            let offset = depth_offset.get_offset();
+            let max_depth = tree.get_max_depth();
+            if depth == max_depth {
+                Some(offset-1)
+            } else if depth < max_depth {
+                Some(
+                    (depth+1..=max_depth)
+                        .map(
+                            |x| {
+                                2_usize
+                                    .pow(x as u32)
+                            }
+                        )
+                        .sum::<usize>() // Sums all the element counting upto the depth (not inclusive) of the index.
+                        + offset // adds the offset to the counting.
+                    )
+            } else {
+                panic!("Unreachable.")
+            }
+        }
+    }
 }
 
 impl Add for Index {
@@ -39,6 +70,12 @@ pub struct DepthOffset(usize, usize);
 impl DepthOffset {
     pub fn new(depth:usize, offset:usize) -> Self {
         DepthOffset(depth, offset)
+    }
+    pub fn get_depth(&self) -> usize {
+        self.0
+    }
+    pub fn get_offset(&self) -> usize {
+        self.1
     }
 }
 
@@ -68,7 +105,7 @@ impl TryFrom<Index> for DepthOffset {
             Ok(DepthOffset::from((i as usize, value-prev)))
         } else if value == 9223372036854775807 {
             Ok(DepthOffset::from((63, 0)))
-        } else {
+        } else { // For efficicency, boundary case for depth = 63 can be hardcoded. In this case, it will remain procedural with ilog(2).
             let closest_log2 = value.checked_ilog(2).ok_or(IndexError::IndexBadilog)?;
             let previous_layers_cardinality: usize = 2_usize
                 .checked_pow(closest_log2).ok_or(IndexError::IndexBadPow)?
@@ -177,7 +214,7 @@ fn try_from_index_to_depthoffset() {
 }
 
 #[test]
-fn max_index_value_is_9223372036854775806() {
+fn try_from_index_value_9223372036854775806() {
     assert_eq!(
         DepthOffset::try_from(Index::from(9223372036854775806)).unwrap()
         , 
@@ -187,7 +224,7 @@ fn max_index_value_is_9223372036854775806() {
 
 // These tests have been shortened for convenience.
 #[test]
-fn index_greater_than_9223372036854775806_are_valid() {
+fn indexes_greater_than_9223372036854775806_are_valid() {
     let _: Vec<_> = (9223372036854775807..=9223372036854775807+100)
         .enumerate()
         .map( |(i,x)| {
@@ -202,24 +239,25 @@ fn index_greater_than_9223372036854775806_are_valid() {
 
 #[test]
 fn depthoffset_index_symmetry_small() {
-    let x: usize = 0;
+    let initial: usize = 0;
     let n_tests = 10000;
-    let _: Vec<_> = (9223372036854775807..=9223372036854775807+n_tests)
+    let _: Vec<_> = (initial..=initial+n_tests)
         .enumerate()
         .map( |(i,x)| {
             assert_eq!(
                 Index::from(x), 
                 Index::try_from(DepthOffset::try_from(Index::from(x)).unwrap()).unwrap()
             );
+            x
         })
         .collect();
 }
 
 #[test]
 fn depthoffset_index_symmetry_big() {
-    let x: usize = 9223372036854775807;
+    let initial: usize = 9223372036854775807;
     let n_tests = 10000;
-    let _: Vec<_> = (9223372036854775807..=9223372036854775807+n_tests)
+    let _: Vec<_> = (initial..=initial+n_tests)
         .enumerate()
         .map( |(i,x)| {
             assert_eq!(

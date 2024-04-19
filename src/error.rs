@@ -3,7 +3,7 @@ pub enum LeMerkLevelError {
     Overflow,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum LeMerkTreeError {
     Overflow,
     BadDivision,

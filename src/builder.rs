@@ -144,7 +144,7 @@ fn build_initial_value_merkletree() {
         }
     );
     assert_eq!(
-        tree.get_root().unwrap(),
+        tree.get_root_data().unwrap(),
         [105, 159, 201, 79, 241, 236, 131, 241, 171, 245, 49, 3, 14, 50, 64, 3, 231, 117, 130, 152, 40, 22, 69, 36, 95, 124, 105, 132, 37, 165, 224, 231],
     );
 }
@@ -159,7 +159,7 @@ fn build_merkletree_depth_20() {
         .try_build::<sha3::Sha3_256>()
         .expect("Unexpected build.");
     assert_eq!(
-        tree.get_root().unwrap(),
+        tree.get_root_data().unwrap(),
         hex!("d4490f4d374ca8a44685fe9471c5b8dbe58cdffd13d30d9aba15dd29efb92930"), 
     );
 }
