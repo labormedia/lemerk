@@ -518,7 +518,7 @@ fn examine_leaves_for_merkletree_depth_20() {
         .collect();
     let are_different: bool = paths.iter().enumerate().fold((true, &vec![Index::from(0)]), | acc: (bool, &Vec<Index>), (i, path)| {
         assert_ne!(acc.1, path, "non equal {}", i);
-        assert_eq!(acc.1[acc.1.len()-1], path[path.len()-1]); // all paths conform to root.
+        assert_eq!(acc.1.last().unwrap(), path.last().unwrap()); // all paths conform to root.
         (acc.0 && path != acc.1, path)
     }).0;
     assert!(are_different);
