@@ -500,7 +500,7 @@ fn examine_leaves_for_merkletree_depth_20() {
         .expect("Unexpected build.");
     let leaves = tree.get_leaves_indexes();
     assert_eq!(leaves.len(), 2_usize.pow(max_depth as u32));
-    let paths = leaves.into_iter()
+    let paths: Vec<Vec<Index>> = leaves.into_iter()
         .map(
             |index| {
                 // Checks all leaves conform to the initial value and not to a different value.
@@ -515,6 +515,13 @@ fn examine_leaves_for_merkletree_depth_20() {
                 tree.get_indexes_path_to_root_by_index(index).unwrap()
             }
         )
+        .collect();
+    let are_different: bool = paths.iter().enumerate().fold((true, &Vec::new()), | acc: (bool, &Vec<Index>), (i, path)| {
+        assert_ne!(acc.1, path, "non equal {}", i);
+        (acc.0 && path != acc.1, path)
+    }).0;
+    assert!(are_different);
+    paths.into_iter()
         .map(
             |path| {
                 path.into_iter()
@@ -540,5 +547,4 @@ fn examine_leaves_for_merkletree_depth_20() {
             }
         )
         .collect::<Vec<Vec<[u8; SIZE]>>>();
-    // assert_eq!(paths[0], vec![[0_u8; SIZE]])
 }
