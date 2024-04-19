@@ -211,6 +211,30 @@ impl<const CIPHER_BLOCK_SIZE: usize> LeMerkTree<CIPHER_BLOCK_SIZE> {
             ))
         }
     }
+    pub fn get_leaves_indexes(&self) -> Vec<Index> {
+        let max_depth = self.get_max_depth();
+        let cardinality = 2_usize.pow(max_depth as u32)-1;
+        (0..=cardinality)
+            .map(
+                |offset| {
+                    cardinality + offset
+                }
+            )
+            .map( |index_usize| {
+                Index::from(index_usize)
+            })
+            .collect()
+    }
+    pub fn get_leaves_virtual_nodes(&self) -> Vec<VirtualNode<CIPHER_BLOCK_SIZE>> {
+        self.get_leaves_indexes()
+            .into_iter()
+            .map(
+                |index| {
+                    self.get_virtual_node_by_index(index).expect("Wrong assumptions.")
+                }
+            )
+            .collect()
+    }
     pub fn get_root_data(&self) -> Result<[u8; CIPHER_BLOCK_SIZE], LeMerkTreeError> {
         Ok(self.flat_hash_tree.get_cipher_block(self.max_index)?)
     }
@@ -357,7 +381,7 @@ fn examine_virtual_nodes_for_tree_depth_length_28() {
         .with_initial_block([0_u8; SIZE])
         .try_build::<sha3::Sha3_256>()
         .expect("Unexpected build.");
-    (1..(&tree).get_max_depth()) // Node 0's ancestor panics when unwrapped.
+    (1..=(&tree).get_max_depth()) // Node 0's ancestor panics when unwrapped.
         .for_each(
             |node_index| {
                 let virtual_node = tree.get_virtual_node_by_index(Index::from(node_index)).unwrap();
@@ -391,6 +415,59 @@ fn examine_virtual_nodes_for_tree_depth_length_28() {
         assert!(virtual_node.is_sucessor(&virtual_node_left_successor));
         assert!(virtual_node.is_sucessor(&virtual_node_right_successor));
     }
+}
 
+#[test]
+fn leaf_of_one_node_tree() {
+    let tree_depth_length = 1;
+    const SIZE: usize = 32;
+    let mut builder: builder::LeMerkBuilder<SIZE> = builder::LeMerkBuilder::<SIZE>::new();
+    let mut tree: LeMerkTree<SIZE> = builder
+        .with_depth_length(tree_depth_length)
+        .with_initial_block([0_u8; SIZE])
+        .try_build::<sha3::Sha3_256>()
+        .expect("Unexpected build.");
+}
 
+#[test]
+#[should_panic(expected = "LengthShouldBeGreaterThanZero")]
+fn building_tree_length_0_should_panic() {
+    let tree_depth_length = 0;
+    const SIZE: usize = 32;
+    let mut builder: builder::LeMerkBuilder<SIZE> = builder::LeMerkBuilder::<SIZE>::new();
+    let mut tree: LeMerkTree<SIZE> = builder
+        .with_depth_length(tree_depth_length)
+        .with_initial_block([0_u8; SIZE])
+        .try_build::<sha3::Sha3_256>()
+        .unwrap();
+}
+
+#[test]
+fn building_tree_length_1_has_one_leaf() {
+    let tree_depth_length = 1;
+    const SIZE: usize = 32;
+    let mut builder: builder::LeMerkBuilder<SIZE> = builder::LeMerkBuilder::<SIZE>::new();
+    let mut tree: LeMerkTree<SIZE> = builder
+        .with_depth_length(tree_depth_length)
+        .with_initial_block([0_u8; SIZE])
+        .try_build::<sha3::Sha3_256>()
+        .expect("Unexpected build.");
+    let leaves = tree.get_leaves_indexes();
+    assert_eq!(leaves.len(), 1);
+    assert_eq!(leaves[0], Index::from(0));
+}
+
+#[test]
+fn building_tree_length_2_has_three_leaves() {
+    let tree_depth_length = 2;
+    const SIZE: usize = 32;
+    let mut builder: builder::LeMerkBuilder<SIZE> = builder::LeMerkBuilder::<SIZE>::new();
+    let mut tree: LeMerkTree<SIZE> = builder
+        .with_depth_length(tree_depth_length)
+        .with_initial_block([0_u8; SIZE])
+        .try_build::<sha3::Sha3_256>()
+        .expect("Unexpected build.");
+    let leaves = tree.get_leaves_indexes();
+    assert_eq!(leaves.len(), 2);
+    assert_eq!(leaves, vec![Index::from(1),Index::from(2)]);
 }

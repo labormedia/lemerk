@@ -15,11 +15,14 @@ use crate::{
     error::LeMerkBuilderError,
 };
 
+#[derive(Clone)]
 pub struct LeMerkBuilder<const BLOCK_SIZE: usize>{
     // Level's length of the Merkle Tree.
     max_depth: usize,
     // An initial block data to instantiate the merkle tree.
     initial_block: [u8; BLOCK_SIZE],
+    // Parameter general validity flag.
+    is_valid: Result<bool, LeMerkBuilderError>,
 }
 
 impl<const BLOCK_SIZE: usize> Default for LeMerkBuilder<BLOCK_SIZE> {
@@ -27,6 +30,7 @@ impl<const BLOCK_SIZE: usize> Default for LeMerkBuilder<BLOCK_SIZE> {
         LeMerkBuilder {
             max_depth: 1,
             initial_block: [0_u8;BLOCK_SIZE],
+            is_valid: Ok(true),
         }
     }
 }
@@ -43,7 +47,7 @@ impl<const BLOCK_SIZE: usize> LeMerkBuilder<BLOCK_SIZE> {
         if depth_length > 0 {
             self.max_depth = depth_length - 1;
         } else {
-            self.max_depth = 0;
+            self.is_valid = Err(LeMerkBuilderError::LengthShouldBeGreaterThanZero);
         };
         self
     }
@@ -52,6 +56,7 @@ impl<const BLOCK_SIZE: usize> LeMerkBuilder<BLOCK_SIZE> {
         self
     }
     pub fn try_build<D: sha3::Digest>(&self) -> Result<LeMerkTree<BLOCK_SIZE>, LeMerkBuilderError>{
+        self.clone().is_valid?;
         let max_depth = self.max_depth;
         let hash_tree_data_length: Index = Index::try_from(DepthOffset::from((max_depth+1,0)))?;
         let max_index: Index = Index::from(hash_tree_data_length.get_index() - 1);

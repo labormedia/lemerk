@@ -53,13 +53,14 @@ pub enum IndexError {
     IndexBadilog,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum LeMerkBuilderError {
     Overflow,
     BadDivision,
     BadMultiplication,
     BadAddition,
     BadPow,
+    LengthShouldBeGreaterThanZero,
 }
 
 impl From<IndexError> for LeMerkBuilderError {
