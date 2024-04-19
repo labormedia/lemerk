@@ -37,7 +37,7 @@ impl Index {
             let offset = depth_offset.get_offset();
             let max_depth = tree.get_max_depth();
             if depth == max_depth {
-                Some(offset-1)
+                Some(offset)
             } else if depth < max_depth {
                 Some(
                     (depth+1..=max_depth)
@@ -61,6 +61,12 @@ impl Add for Index {
     type Output = Self;
     fn add(self, other: Self) -> Self {
         Index(self.get_index() + other.get_index())
+    }
+}
+
+impl From<usize> for Index {
+    fn from(value:usize) -> Self {
+        Index::from(value)
     }
 }
 
