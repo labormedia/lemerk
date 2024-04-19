@@ -1,31 +1,31 @@
-/// LeMerk is a custom Merkle Tree implemention.
+///! LeMerk is a custom Merkle Tree implemention.
 use sha3;
 use hex_literal::hex;
 use core::iter::Iterator;
-// Crypto helpers.
-mod crypto;
+/// Crypto helpers.
+pub mod crypto;
 use crypto::hash_visit;
-// LeMerk tree builder pattern.
+/// LeMerk tree builder pattern.
 pub mod builder;
-// Tree data elements
-mod data;
-use data::{
+/// Tree data elements
+pub mod data;
+pub use data::{
     CipherBlock,
     Index,
     DepthOffset,
 };
 pub mod error;
 use error::*;
-mod traits;
+pub mod traits;
 use traits::SizedTree;
 
-// Memory layout for a single layer of blocks. This is used for the expansion of the levels in the builder 
-// and the final flatten expansion of the whole tree, in a single layer indexed by the struct implementation.
+/// Memory layout for a single layer of blocks. This is used for the expansion of the levels in the builder 
+/// and the final flatten expansion of the whole tree, in a single layer indexed by the struct implementation.
 #[derive(PartialEq, Debug, Clone)]
-struct LeMerkLevel<const CIPHER_BLOCK_SIZE: usize>(Vec<[u8; CIPHER_BLOCK_SIZE]>);
+pub struct LeMerkLevel<const CIPHER_BLOCK_SIZE: usize>(Vec<[u8; CIPHER_BLOCK_SIZE]>);
 
 impl<const CIPHER_BLOCK_SIZE: usize> LeMerkLevel<CIPHER_BLOCK_SIZE> {
-    fn get_cipher_block_mut_ref(&mut self, value: Index) -> Result<&mut [u8; CIPHER_BLOCK_SIZE], LeMerkLevelError>{
+    pub fn get_cipher_block_mut_ref(&mut self, value: Index) -> Result<&mut [u8; CIPHER_BLOCK_SIZE], LeMerkLevelError>{
         let index_usize = value.get_index();
         if index_usize < self.0.len() {
             Ok(&mut self.0[index_usize])
@@ -33,7 +33,7 @@ impl<const CIPHER_BLOCK_SIZE: usize> LeMerkLevel<CIPHER_BLOCK_SIZE> {
             Err(LeMerkLevelError::Overflow)
         }
     }
-    fn get_cipher_block(&self, index: Index) -> Result<[u8; CIPHER_BLOCK_SIZE], LeMerkLevelError>{
+    pub fn get_cipher_block(&self, index: Index) -> Result<[u8; CIPHER_BLOCK_SIZE], LeMerkLevelError>{
         let index_usize = index.get_index();
         if index_usize < self.0.len() {
             Ok(self.0[index_usize])
@@ -41,10 +41,10 @@ impl<const CIPHER_BLOCK_SIZE: usize> LeMerkLevel<CIPHER_BLOCK_SIZE> {
             Err(LeMerkLevelError::Overflow)
         }
     }
-    fn from(vector: Vec<[u8; CIPHER_BLOCK_SIZE]>) -> LeMerkLevel<CIPHER_BLOCK_SIZE> {
+    pub fn from(vector: Vec<[u8; CIPHER_BLOCK_SIZE]>) -> LeMerkLevel<CIPHER_BLOCK_SIZE> {
         LeMerkLevel::<CIPHER_BLOCK_SIZE>(vector)
     }
-    fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.0.len()
     }
 }
@@ -60,7 +60,7 @@ impl<const CIPHER_BLOCK_SIZE: usize> Iterator for LeMerkLevel<CIPHER_BLOCK_SIZE>
                 (0..level_length.checked_div(2)?)
                     .map(|i| Index::from(i*2))
                     .map(|i| { 
-                        let left = self.get_cipher_block(i).unwrap(); // TODO : make this unwrap infallible
+                        let left = self.get_cipher_block(i).unwrap(); /// TODO : make this unwrap infallible
                         let right = self.get_cipher_block(i.incr()).unwrap();
                         let mut output = [0_u8; CIPHER_BLOCK_SIZE];
                         hash_visit::<sha3::Sha3_256>(&left,&right, &mut output);
@@ -79,39 +79,38 @@ impl<const CIPHER_BLOCK_SIZE: usize> Iterator for LeMerkLevel<CIPHER_BLOCK_SIZE>
     // }
 }
 
-// Memory layout for a LeMerk Tree.
+/// Memory layout for a LeMerk Tree.
 #[derive(PartialEq, Debug)]
-struct LeMerkTree<const CIPHER_BLOCK_SIZE: usize> {
-    // Level's length of the Merkle Tree.
+pub struct LeMerkTree<const CIPHER_BLOCK_SIZE: usize> {
+    /// Level's length of the Merkle Tree.
     max_depth: usize,
-    // Maximum possible Index
+    /// Maximum possible Index
     max_index: Index,
-    // A flatten representation of the whole tree.
+    /// A flatten representation of the whole tree.
     flat_hash_tree: LeMerkLevel<CIPHER_BLOCK_SIZE>,
 }
 
 #[derive(Debug, PartialEq)]
-struct VirtualNode<const CIPHER_BLOCK_SIZE: usize> {
-    // data_hash: [u8; CIPHER_BLOCK_SIZE],
-    // Zero based index. This is designed to be implemented for a flat_hash_tree as LeMerkLevel representation of an entire tree.
+pub struct VirtualNode<const CIPHER_BLOCK_SIZE: usize> {
+    /// data_hash: [u8; CIPHER_BLOCK_SIZE],
+    /// Zero based index. This is designed to be implemented for a flat_hash_tree as LeMerkLevel representation of an entire tree.
     index: Index,
-    // Index in the flat hash tree representaion.
+    /// Index in the flat hash tree representaion.
     flat_tree_index: usize,
-    // Option wrapping the index of the ancestor, None if there's no ancestor (root). 
+    /// Option wrapping the index of the ancestor, None if there's no ancestor (root). 
     ancestor: Option<Index>,
     left_successor: Option<Index>,
     right_successor: Option<Index>
 }
 
-// VirtualNode is a data structure designed to be used in the context of a LeMerkTree.
-// A LeMerkTree will use this data structure to build the virtual paths to the data contained in the flatten hash tree.
-// As it is meant to be used in the context of a LeMerkTree, its methods are private.
+/// VirtualNode is a data structure designed to be used in the context of a LeMerkTree.
+/// A LeMerkTree will use this data structure to build the virtual paths to the data contained in the flatten hash tree.
 impl<const CIPHER_BLOCK_SIZE: usize> VirtualNode<CIPHER_BLOCK_SIZE> {
-    fn get_index(&self) -> Index {
+    pub fn get_index(&self) -> Index {
         self.index
     }
-    fn get_ancestor(&self) -> Result<Option<Index>, IndexError> {
-        if self.get_index() == Index::from(0) { return Ok(None) }; // Index 0's ancestor is None.
+    pub fn get_ancestor(&self) -> Result<Option<Index>, IndexError> {
+        if self.get_index() == Index::from(0) { return Ok(None) }; /// Index 0's ancestor is None.
         let index = self.index.get_index();
         let be_ancestor = index
             .checked_sub(1).ok_or(IndexError::IndexBadSubstraction)?
@@ -119,9 +118,9 @@ impl<const CIPHER_BLOCK_SIZE: usize> VirtualNode<CIPHER_BLOCK_SIZE> {
         let ancestor: Option<Index> = if be_ancestor < index { Some(Index::from(be_ancestor)) } else { None };
         Ok(ancestor)
     }
-    // Gets a Result with an Option to the index value of the binary pair to the ancestor of the node.
-    // If the original index of the VirtualNode is 0 returns Some(None).
-    fn get_pair_to_ancestor(&self) -> Result<Option<Index>, IndexError> {
+    /// Gets a Result with an Option to the index value of the binary pair to the ancestor of the node.
+    /// If the original index of the VirtualNode is 0 returns Some(None).
+    pub fn get_pair_to_ancestor(&self) -> Result<Option<Index>, IndexError> {
         if Index::from(1) == self.get_index().checked_rem(2)? {
             Ok(Some(self.get_index().incr())) // if odd then increment.
         } else {
@@ -132,10 +131,10 @@ impl<const CIPHER_BLOCK_SIZE: usize> VirtualNode<CIPHER_BLOCK_SIZE> {
             }
         }
     }
-    fn get_successors_indexes(&self) -> (Option<Index>, Option<Index>) {
+    pub fn get_successors_indexes(&self) -> (Option<Index>, Option<Index>) {
         (self.left_successor, self.right_successor)
     }
-    fn is_sucessor(&self, other: &VirtualNode<CIPHER_BLOCK_SIZE>) -> bool {
+    pub fn is_sucessor(&self, other: &VirtualNode<CIPHER_BLOCK_SIZE>) -> bool {
         let (left, right) = self.get_successors_indexes();
         if left == Some(other.get_index()) || right == Some(other.get_index()) {
             true
@@ -143,7 +142,7 @@ impl<const CIPHER_BLOCK_SIZE: usize> VirtualNode<CIPHER_BLOCK_SIZE> {
             false
         }
     }
-    fn is_ancestor(&self, other: &VirtualNode<CIPHER_BLOCK_SIZE>) -> bool {
+    pub fn is_ancestor(&self, other: &VirtualNode<CIPHER_BLOCK_SIZE>) -> bool {
         if Ok(Some(other.get_index())) == self.get_ancestor() {
             true
         } else {
@@ -189,7 +188,7 @@ impl<const CIPHER_BLOCK_SIZE: usize> LeMerkTree<CIPHER_BLOCK_SIZE> {
             };
         Ok(
             VirtualNode {
-                // data_hash: self.flat_hash_tree.get_cipher_block(index)?,
+                /// data_hash: self.flat_hash_tree.get_cipher_block(index)?,
                 index,
                 flat_tree_index,
                 ancestor,
@@ -252,7 +251,7 @@ impl<const CIPHER_BLOCK_SIZE: usize> LeMerkTree<CIPHER_BLOCK_SIZE> {
     pub fn get_root_data(&self) -> Result<[u8; CIPHER_BLOCK_SIZE], LeMerkTreeError> {
         Ok(self.flat_hash_tree.get_cipher_block(self.max_index)?)
     }
-    // Calculates the node's values in place.
+    /// Calculates the node's values in place.
     fn recalculate(&mut self, index:Index) {
         todo!()
     }
@@ -357,7 +356,7 @@ fn get_last_and_pre_last_levels_from_tree_depth_20() {
         .try_build::<sha3::Sha3_256>()
         .expect("Unexpected build.");
     let mut pre_last_level = tree.get_level_by_depth_index(pre_last_level_depth_index).unwrap();
-    let mut last_level = tree.get_level_by_depth_index(last_level_depth_index).unwrap();  // Max depth index for a LeMerkTree of depth length K is (K - 1).
+    let mut last_level = tree.get_level_by_depth_index(last_level_depth_index).unwrap();  /// Max depth index for a LeMerkTree of depth length K is (K - 1).
     assert_eq!(
         pre_last_level.len(),
         2_usize.pow(pre_last_level_depth_index as u32)
@@ -416,7 +415,7 @@ fn examine_virtual_nodes_for_tree_depth_length_28() {
             }
         );
     
-    {   // tests for node 0;
+    {   /// tests for node 0;
         let virtual_node = tree.get_virtual_node_by_index(Index::from(0)).unwrap();
         assert_eq!(virtual_node.get_ancestor(), Ok(None));
         let (left_successor_index, right_successor_index) = virtual_node.get_successors_indexes();
@@ -495,17 +494,17 @@ fn examine_leaves_for_merkletree_depth_20() {
     let different_custom_block = hex!("ababababababaffbabababababababababababababababababababababababab");
     let mut tree: LeMerkTree<SIZE> = builder
         .with_max_depth(max_depth)
-        .with_initial_block(custom_block)
+        .with_initial_block(custom_block)  // A custom block.
         .try_build::<sha3::Sha3_256>()
         .expect("Unexpected build.");
     let leaves = tree.get_leaves_indexes();
-    assert_eq!(leaves.len(), 2_usize.pow(max_depth as u32));
+    assert_eq!(leaves.len(), 2_usize.pow(max_depth as u32)); /// size of leaves layer is 2_usize.pow(max_depth as u32).
     let paths: Vec<Vec<Index>> = leaves.into_iter()
         .map(
             |index| {
-                // Checks all leaves conform to the initial value and not to a different value.
+                /// Checks all leaves conform to the initial value and not to a different value.
                 let cipher_block = tree.get_cipher_block_by_index(index).unwrap();
-                assert_eq!(cipher_block, custom_block);
+                assert_eq!(cipher_block, custom_block);  /// Test against a custom block.
                 assert_ne!(cipher_block, different_custom_block);
                 index
             }
@@ -518,7 +517,7 @@ fn examine_leaves_for_merkletree_depth_20() {
         .collect();
     let are_different: bool = paths.iter().enumerate().fold((true, &vec![Index::from(0)]), | acc: (bool, &Vec<Index>), (i, path)| {
         assert_ne!(acc.1, path, "non equal {}", i);
-        assert_eq!(acc.1.last().unwrap(), path.last().unwrap()); // all paths conform to root.
+        assert_eq!(acc.1.last().unwrap(), path.last().unwrap()); /// all paths conform to root.
         (acc.0 && path != acc.1, path)
     }).0;
     assert!(are_different);
@@ -536,7 +535,7 @@ fn examine_leaves_for_merkletree_depth_20() {
         )
         .map(
             |cipher_path| {
-                assert_eq!( // all paths are initiated equal.
+                assert_eq!( /// all paths are initiated equal.
                     cipher_path,
                     [[171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171], [105, 159, 201, 79, 241, 236, 131, 241, 171, 245, 49, 3, 14, 50, 64, 3, 231, 117, 130, 152, 40, 22, 69, 36, 95, 124, 105, 132, 37, 165, 224, 231], [162, 66, 36, 51, 36, 74, 29, 162, 75, 60, 77, 177, 38, 220, 197, 147, 102, 111, 152, 54, 84, 3, 230, 170, 240, 127, 174, 1, 28, 130, 79, 9], [236, 70, 168, 219, 199, 251, 13, 165, 117, 59, 17, 243, 255, 4, 238, 107, 122, 42, 151, 155, 22, 128, 37, 212, 3, 148, 160, 255, 76, 242, 223, 89], [52, 250, 196, 184, 120, 29, 11, 129, 23, 70, 236, 69, 98, 54, 6, 244, 61, 241, 168, 185, 0, 159, 137, 197, 86, 78, 104, 2, 90, 111, 214, 4], [184, 177, 129, 15, 84, 196, 4, 137, 19, 9, 13, 120, 152, 55, 18, 189, 84, 205, 75, 174, 78, 35, 107, 225, 242, 148, 18, 35, 136, 171, 239, 107], [74, 1, 16, 67, 89, 76, 140, 2, 158, 198, 20, 25, 50, 197, 85, 185, 156, 70, 74, 183, 87, 52, 2, 122, 235, 150, 142, 216, 127, 213, 39, 92], [144, 2, 154, 203, 227, 37, 76, 99, 188, 157, 212, 168, 241, 228, 184, 226, 123, 68, 69, 187, 94, 90, 88, 151, 175, 146, 81, 236, 116, 79, 111, 104], [20, 137, 173, 94, 133, 206, 43, 108, 188, 207, 210, 242, 95, 141, 99, 209, 21, 255, 128, 25, 154, 251, 196, 236, 79, 111, 194, 72, 75, 248, 214, 144], [199, 149, 73, 74, 166, 98, 221, 1, 44, 93, 230, 197, 47, 10, 178, 142, 233, 19, 95, 232, 70, 7, 77, 98, 187, 120, 7, 207, 152, 116, 47, 217], [6, 132, 195, 134, 128, 128, 182, 236, 30, 89, 241, 70, 83, 117, 64, 179, 214, 48, 214, 19, 78, 179, 181, 24, 206, 83, 68, 184, 118, 10, 12, 178], [112, 5, 22, 23, 159, 4, 233, 224, 30, 189, 190, 41, 135, 230, 174, 184, 138, 212, 110, 223, 94, 234, 144, 48, 118, 239, 57, 50, 123, 165, 186, 139], [213, 173, 250, 186, 155, 60, 80, 24, 247, 210, 60, 212, 10, 236, 72, 190, 36, 236, 142, 167, 225, 248, 97, 3, 52, 144, 238, 53, 222, 84, 113, 110], [215, 217, 236, 242, 106, 206, 134, 76, 156, 5, 85, 70, 77, 50, 213, 30, 39, 104, 211, 78, 76, 122, 99, 84, 99, 5, 42, 5, 217, 30, 103, 32], [68, 173, 20, 144, 23, 157, 178, 132, 246, 250, 33, 216, 239, 251, 209, 186, 106, 48, 40, 4, 43, 150, 190, 155, 36, 159, 83, 141, 227, 245, 122, 133], [11, 121, 42, 233, 186, 63, 247, 200, 251, 140, 158, 71, 99, 38, 145, 147, 252, 24, 132, 29, 42, 102, 140, 64, 51, 236, 45, 140, 204, 109, 127, 88], [125, 200, 91, 118, 13, 230, 194, 25, 29, 82, 33, 109, 157, 220, 253, 209, 22, 164, 86, 216, 11, 195, 166, 39, 120, 59, 66, 24, 180, 197, 126, 167], [234, 147, 70, 82, 103, 201, 186, 242, 254, 236, 157, 228, 241, 85, 85, 172, 37, 4, 238, 212, 147, 144, 10, 192, 51, 187, 208, 168, 187, 52, 202, 99], [244, 96, 234, 249, 100, 250, 60, 212, 18, 150, 230, 14, 253, 191, 109, 215, 223, 84, 156, 120, 12, 63, 185, 67, 46, 23, 132, 168, 157, 248, 67, 2], [212, 73, 15, 77, 55, 76, 168, 164, 70, 133, 254, 148, 113, 197, 184, 219, 229, 140, 223, 253, 19, 211, 13, 154, 186, 21, 221, 41, 239, 185, 41, 48]]
                 );

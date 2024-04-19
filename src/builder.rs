@@ -17,11 +17,11 @@ use crate::{
 
 #[derive(Clone)]
 pub struct LeMerkBuilder<const BLOCK_SIZE: usize>{
-    // Level's length of the Merkle Tree.
+    /// Level's length of the Merkle Tree.
     max_depth: usize,
-    // An initial block data to instantiate the merkle tree.
+    /// An initial block data to instantiate the merkle tree.
     initial_block: [u8; BLOCK_SIZE],
-    // Parameter general validity flag.
+    /// Parameter general validity flag.
     is_valid: Result<bool, LeMerkBuilderError>,
 }
 

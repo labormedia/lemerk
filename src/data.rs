@@ -87,12 +87,12 @@ impl DepthOffset {
 
 impl TryFrom<Index> for DepthOffset {
     type Error = IndexError;    
-    // Incrementing from i = 0, 2_usize.pow(i) - 1 is always positive until OverFlow.
-    // With an upper bound of value + 1, the condition "2_usize.pow(i) - 1 <= value.get_index() + 1" will always conform to false in the sequence 0..9223372036854775806 with step 1.
-    // Unless value > 9223372036854775806.
+    /// Incrementing from i = 0, 2_usize.pow(i) - 1 is always positive until OverFlow.
+    /// With an upper bound of value + 1, the condition "2_usize.pow(i) - 1 <= value.get_index() + 1" will always conform to false in the sequence 0..9223372036854775806 with step 1.
+    /// Unless value > 9223372036854775806.
     fn try_from(value: Index) -> Result<DepthOffset, Self::Error> {
         let value = value.get_index();
-        if value < 9223372036854775806 { // The last possible level under usize precision is 63
+        if value < 9223372036854775806 { /// The last possible level under usize precision is 63
             let mut i: u32 = 0;
             let mut acc: usize = 2_usize
                 .checked_pow(i+1).ok_or(IndexError::IndexBadPow)?
@@ -111,7 +111,7 @@ impl TryFrom<Index> for DepthOffset {
             Ok(DepthOffset::from((i as usize, value-prev)))
         } else if value == 9223372036854775807 {
             Ok(DepthOffset::from((63, 0)))
-        } else { // For efficicency, boundary case for depth = 63 can be hardcoded. In this case, it will remain procedural with ilog(2).
+        } else { /// For efficicency, boundary case for depth = 63 can be hardcoded. In this case, it will remain procedural with ilog(2).
             let closest_log2 = value.checked_ilog(2).ok_or(IndexError::IndexBadilog)?;
             let previous_layers_cardinality: usize = 2_usize
                 .checked_pow(closest_log2).ok_or(IndexError::IndexBadPow)?
@@ -228,7 +228,7 @@ fn try_from_index_value_9223372036854775806() {
     );
 }
 
-// These tests have been shortened for convenience.
+/// These tests have been shortened for convenience.
 #[test]
 fn indexes_greater_than_9223372036854775806_are_valid() {
     let _: Vec<_> = (9223372036854775807..=9223372036854775807+100)
