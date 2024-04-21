@@ -11,6 +11,8 @@ pub enum LeMerkTreeError {
     BadAddition,
     BadSubstraction,
     BadPow,
+    IsNone,
+    OutOfBounds,
 }
 
 pub enum VirtualNodeError {

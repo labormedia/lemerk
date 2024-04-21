@@ -164,7 +164,7 @@ impl<const CIPHER_BLOCK_SIZE: usize> VirtualNode<CIPHER_BLOCK_SIZE> {
     pub fn get_index(&self) -> Index {
         self.index
     }
-    pub fn get_ancestor(&self) -> Result<Option<Index>, IndexError> {
+    pub fn get_ancestor_index(&self) -> Result<Option<Index>, IndexError> {
         if self.get_index() == Index::from(0) { return Ok(None) }; // Index 0's ancestor is None.
         let index = self.index.get_index();
         let be_ancestor = index
@@ -175,7 +175,7 @@ impl<const CIPHER_BLOCK_SIZE: usize> VirtualNode<CIPHER_BLOCK_SIZE> {
     }
     /// Gets a Result with an Option to the index value of the binary pair to the ancestor of the node.
     /// If the original index of the VirtualNode is 0 returns Some(None).
-    pub fn get_pair_to_ancestor(&self) -> Result<Option<Index>, IndexError> {
+    pub fn get_pair_index_to_ancestor(&self) -> Result<Option<Index>, IndexError> {
         if Index::from(1) == self.get_index().checked_rem(2)? {
             Ok(Some(self.get_index().incr())) // if odd then increment.
         } else {
@@ -185,6 +185,9 @@ impl<const CIPHER_BLOCK_SIZE: usize> VirtualNode<CIPHER_BLOCK_SIZE> {
                 Ok(Some(self.get_index().try_decr()?)) // if even then decrement.
             }
         }
+    }
+    fn get_flat_tree_index(&self) -> usize {
+        self.flat_tree_index
     }
     pub fn get_successors_indexes(&self) -> (Option<Index>, Option<Index>) {
         (self.left_successor, self.right_successor)
@@ -198,7 +201,7 @@ impl<const CIPHER_BLOCK_SIZE: usize> VirtualNode<CIPHER_BLOCK_SIZE> {
         }
     }
     pub fn is_ancestor(&self, other: &VirtualNode<CIPHER_BLOCK_SIZE>) -> bool {
-        if Ok(Some(other.get_index())) == self.get_ancestor() {
+        if Ok(Some(other.get_index())) == self.get_ancestor_index() {
             true
         } else {
             false
@@ -252,6 +255,9 @@ impl<const CIPHER_BLOCK_SIZE: usize> LeMerkTree<CIPHER_BLOCK_SIZE> {
             }
         )
     }
+    pub fn get_data_layer_length(&self) -> usize {
+        self.data_layer_length
+    }
     pub fn get_level_by_depth_index(&self, depth: usize) -> Result<LeMerkLevel<CIPHER_BLOCK_SIZE>, LeMerkTreeError> {
         let max_index = self.max_index.get_index();
         if depth > self.max_depth {
@@ -293,11 +299,59 @@ impl<const CIPHER_BLOCK_SIZE: usize> LeMerkTree<CIPHER_BLOCK_SIZE> {
         let mut result = Vec::new();
         let mut virtual_node = self.get_virtual_node_by_index(index)?;
         result.push(virtual_node.get_index());
-        while let Some(ancestor_index) = virtual_node.get_ancestor()? {
+        while let Some(ancestor_index) = virtual_node.get_ancestor_index()? {
             virtual_node = self.get_virtual_node_by_index(ancestor_index)?;
             result.push(virtual_node.get_index());
         };
         Ok(result)
+    }
+    pub fn verify_path_to_root_by_index(&self, index: Index) -> Result<[u8; CIPHER_BLOCK_SIZE], LeMerkTreeError> {
+        let mut result = self.get_cipher_block_by_index(index)?.clone();
+        let mut virtual_node = self.get_virtual_node_by_index(index)?;
+        while let Some(ancestor_index) = virtual_node.get_ancestor_index()? {
+            let virtual_node_flat_tree_index = virtual_node.get_flat_tree_index();
+            let pair_to_ancestor_flat_tree_index = self.get_virtual_node_by_index(
+                    virtual_node.get_pair_index_to_ancestor()?.ok_or(LeMerkTreeError::IsNone)?
+                )?.get_flat_tree_index();
+            let ancestor_virtual_node = self.get_virtual_node_by_index(ancestor_index)?;
+            let ancestor_flat_tree_index = ancestor_virtual_node.get_flat_tree_index();
+            
+            hash_visit::<sha3::Sha3_256>(
+                &self.flat_hash_tree.get_cipher_block(virtual_node_flat_tree_index.into())?,
+                &self.flat_hash_tree.get_cipher_block(pair_to_ancestor_flat_tree_index.into())?,
+                &mut result
+            );
+            assert_eq!(self.flat_hash_tree.get_cipher_block(ancestor_flat_tree_index.into())?, result);
+            virtual_node = self.get_virtual_node_by_index(ancestor_index)?;
+        };
+        Ok(self.get_root_data()?)
+    }
+    pub fn set_and_update(&mut self, index: Index, block: [u8; CIPHER_BLOCK_SIZE]) -> Result<[u8; CIPHER_BLOCK_SIZE], LeMerkTreeError> {
+        let mut virtual_node = self.get_virtual_node_by_index(index)?;
+        let flat_tree_index_to_update = virtual_node.get_flat_tree_index();
+        if flat_tree_index_to_update >= self.get_data_layer_length() {
+            Err(LeMerkTreeError::OutOfBounds)
+        } else {
+            *self.flat_hash_tree.get_cipher_block_mut_ref(flat_tree_index_to_update.into())? = block;
+            let mut result = self.get_cipher_block_by_index(index)?.clone();
+            while let Some(ancestor_index) = virtual_node.get_ancestor_index()? {
+                let virtual_node_flat_tree_index = virtual_node.get_flat_tree_index();
+                let pair_to_ancestor_flat_tree_index = self.get_virtual_node_by_index(
+                        virtual_node.get_pair_index_to_ancestor()?.ok_or(LeMerkTreeError::IsNone)?
+                    )?.get_flat_tree_index();
+                let ancestor_virtual_node = self.get_virtual_node_by_index(ancestor_index)?;
+                let ancestor_flat_tree_index = ancestor_virtual_node.get_flat_tree_index();
+                
+                hash_visit::<sha3::Sha3_256>(
+                    &self.flat_hash_tree.get_cipher_block(virtual_node_flat_tree_index.into())?,
+                    &self.flat_hash_tree.get_cipher_block(pair_to_ancestor_flat_tree_index.into())?,
+                    &mut result
+                );
+                *self.flat_hash_tree.get_cipher_block_mut_ref(ancestor_flat_tree_index.into())? = result;
+                virtual_node = self.get_virtual_node_by_index(ancestor_index)?;
+            };
+            Ok(self.get_root_data()?)
+        }
     }
     pub fn get_cipher_block_by_index(&self, index: Index) -> Result<[u8; CIPHER_BLOCK_SIZE], LeMerkTreeError> {
         let flat_tree_index = index.to_flat_hash_tree_index(self).ok_or(IndexError::IndexOverflow)?;
@@ -453,16 +507,16 @@ fn examine_virtual_nodes_for_tree_depth_length_28() {
         .for_each(
             |node_index| {
                 let virtual_node = tree.get_virtual_node_by_index(Index::from(node_index)).unwrap();
-                let virtual_node_ancestor = tree.get_virtual_node_by_index(virtual_node.get_ancestor().unwrap().unwrap()).unwrap();
+                let virtual_node_ancestor = tree.get_virtual_node_by_index(virtual_node.get_ancestor_index().unwrap().unwrap()).unwrap();
                 let (left_successor_index, right_successor_index) = virtual_node.get_successors_indexes();
                 let virtual_node_left_successor = tree.get_virtual_node_by_index(left_successor_index.unwrap().into()).unwrap();
                 let virtual_node_right_successor = tree.get_virtual_node_by_index(right_successor_index.unwrap().into()).unwrap();
                 assert!(virtual_node_ancestor.is_sucessor(&virtual_node));
                 assert!(virtual_node.is_ancestor(&virtual_node_ancestor));
                 assert_ne!(virtual_node_left_successor, virtual_node_right_successor);
-                assert_eq!(virtual_node_left_successor.get_ancestor(), virtual_node_right_successor.get_ancestor());
-                assert_eq!(virtual_node_left_successor.get_pair_to_ancestor().unwrap().unwrap(), virtual_node_right_successor.get_index());
-                assert_eq!(virtual_node_right_successor.get_pair_to_ancestor().unwrap().unwrap(), virtual_node_left_successor.get_index());
+                assert_eq!(virtual_node_left_successor.get_ancestor_index(), virtual_node_right_successor.get_ancestor_index());
+                assert_eq!(virtual_node_left_successor.get_pair_index_to_ancestor().unwrap().unwrap(), virtual_node_right_successor.get_index());
+                assert_eq!(virtual_node_right_successor.get_pair_index_to_ancestor().unwrap().unwrap(), virtual_node_left_successor.get_index());
                 assert!(virtual_node_left_successor.is_ancestor(&virtual_node));
                 assert!(virtual_node_right_successor.is_ancestor(&virtual_node));
                 assert!(virtual_node.is_sucessor(&virtual_node_left_successor));
@@ -472,12 +526,12 @@ fn examine_virtual_nodes_for_tree_depth_length_28() {
     
     {   /// tests for node 0;
         let virtual_node = tree.get_virtual_node_by_index(Index::from(0)).unwrap();
-        assert_eq!(virtual_node.get_ancestor(), Ok(None));
+        assert_eq!(virtual_node.get_ancestor_index(), Ok(None));
         let (left_successor_index, right_successor_index) = virtual_node.get_successors_indexes();
         let virtual_node_left_successor = tree.get_virtual_node_by_index(left_successor_index.unwrap().into()).unwrap();
         let virtual_node_right_successor = tree.get_virtual_node_by_index(right_successor_index.unwrap().into()).unwrap();
         assert_ne!(virtual_node_left_successor, virtual_node_right_successor);
-        assert_eq!(virtual_node_left_successor.get_ancestor(), virtual_node_right_successor.get_ancestor());
+        assert_eq!(virtual_node_left_successor.get_ancestor_index(), virtual_node_right_successor.get_ancestor_index());
         assert!(virtual_node_left_successor.is_ancestor(&virtual_node));
         assert!(virtual_node_right_successor.is_ancestor(&virtual_node));
         assert!(virtual_node.is_sucessor(&virtual_node_left_successor));
@@ -602,4 +656,55 @@ fn examine_leaves_for_merkletree_depth_20() {
             }
         )
         .collect::<Vec<Vec<[u8; SIZE]>>>();
+}
+
+#[test]
+fn verify_paths_for_merkletree_depth_20() {
+    const SIZE: usize = 32;
+    let max_depth = 19;
+    let mut builder: builder::LeMerkBuilder<SIZE> = builder::LeMerkBuilder::<SIZE>::new();
+    let custom_block = hex!("abababababababababababababababababababababababababababababababab");
+    let different_custom_block = hex!("ababababababaffbabababababababababababababababababababababababab");
+    let mut tree: LeMerkTree<SIZE> = builder
+        .with_max_depth(max_depth)
+        .with_initial_block(custom_block)  // A custom block.
+        .try_build::<sha3::Sha3_256>()
+        .expect("Unexpected build.");
+    let leaves = tree.get_leaves_indexes();
+    leaves.iter()
+        .take(15)
+        .for_each(
+            |x| {
+                let verified = tree.verify_path_to_root_by_index(*x).unwrap();
+                assert_eq!(verified, tree.get_root_data().unwrap())
+            }
+        );
+
+}
+
+#[test]
+fn set_and_update_merkletree_depth_20() {
+    const SIZE: usize = 32;
+    let max_depth = 19;
+    let mut builder: builder::LeMerkBuilder<SIZE> = builder::LeMerkBuilder::<SIZE>::new();
+    let custom_block = hex!("abababababababababababababababababababababababababababababababab");
+    let different_custom_block = hex!("ababababababaffbabababababababababababababababababababababababab");
+    let mut tree: LeMerkTree<SIZE> = builder
+        .with_max_depth(max_depth)
+        .with_initial_block(custom_block)  // A custom block.
+        .try_build::<sha3::Sha3_256>()
+        .expect("Unexpected build.");
+    let original_root_data = tree.get_root_data();
+    let leaves = tree.get_leaves_indexes();
+    leaves.into_iter()
+        .take(15)
+        .for_each(
+            |x| {
+                tree.set_and_update(x, different_custom_block);
+                let verified = tree.verify_path_to_root_by_index(x).unwrap();
+                assert_eq!(verified, tree.get_root_data().unwrap())
+            }
+        );
+    assert_ne!(tree.get_root_data(), original_root_data);
+
 }
