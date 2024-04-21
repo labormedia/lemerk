@@ -49,8 +49,60 @@ impl<const CIPHER_BLOCK_SIZE: usize> LeMerkLevel<CIPHER_BLOCK_SIZE> {
     }
 }
 
+/// The Iterator implementation maps the LeMerkLevel's hash_visit pair combinations to its next depth level closer to root, if not root.
+/// As root doesn't have a different pair to its ancestor, because there's no other distinct pair and because it has ancestor None, then its next() value is None.
+///     
+/// ```
+/// use lemerk::LeMerkLevel;
+///     const SIZE: usize = 32;
+///     let mut level: LeMerkLevel<SIZE> = LeMerkLevel::from(vec![[0_u8;SIZE]; 4]);
+///     let mut next_level = level.next().expect("Wrong assumptions.");
+///     let root = next_level.next().expect("Wrong assumptions.");
+///     assert_eq!(
+///         LeMerkLevel::from(
+///             [
+///                 [7, 15, 161, 171, 111, 204, 85, 126, 209, 77, 66, 148, 31, 25, 103, 105, 48, 72, 85, 30, 185, 4, 42, 141, 10, 5, 122, 251, 215, 94, 129, 224],
+///                 [7, 15, 161, 171, 111, 204, 85, 126, 209, 77, 66, 148, 31, 25, 103, 105, 48, 72, 85, 30, 185, 4, 42, 141, 10, 5, 122, 251, 215, 94, 129, 224]
+///             ].to_vec()
+///         ), 
+///         next_level
+///     );
+///     assert_eq!(
+///         LeMerkLevel::from(
+///             [
+///                 [83, 218, 176, 66, 48, 138, 183, 1, 176, 115, 237, 212, 209, 76, 86, 84, 161, 247, 13, 33, 11, 103, 14, 242, 136, 201, 174, 234, 156, 74, 69, 48]
+///             ].to_vec()
+///         ), 
+///         root
+///     );
+/// ```
 impl<const CIPHER_BLOCK_SIZE: usize> Iterator for LeMerkLevel<CIPHER_BLOCK_SIZE> {
     type Item = LeMerkLevel<CIPHER_BLOCK_SIZE>;
+    ///     
+    /// ```
+    /// use lemerk::LeMerkLevel;
+    ///     const SIZE: usize = 32;
+    ///     let mut level: LeMerkLevel<SIZE> = LeMerkLevel::from(vec![[0_u8;SIZE]; 4]);
+    ///     let mut next_level = level.next().expect("Wrong assumptions.");
+    ///     let root = next_level.next().expect("Wrong assumptions.");
+    ///     assert_eq!(
+    ///         LeMerkLevel::from(
+    ///             [
+    ///                 [7, 15, 161, 171, 111, 204, 85, 126, 209, 77, 66, 148, 31, 25, 103, 105, 48, 72, 85, 30, 185, 4, 42, 141, 10, 5, 122, 251, 215, 94, 129, 224],
+    ///                 [7, 15, 161, 171, 111, 204, 85, 126, 209, 77, 66, 148, 31, 25, 103, 105, 48, 72, 85, 30, 185, 4, 42, 141, 10, 5, 122, 251, 215, 94, 129, 224]
+    ///             ].to_vec()
+    ///         ), 
+    ///         next_level
+    ///     );
+    ///     assert_eq!(
+    ///         LeMerkLevel::from(
+    ///             [
+    ///                 [83, 218, 176, 66, 48, 138, 183, 1, 176, 115, 237, 212, 209, 76, 86, 84, 161, 247, 13, 33, 11, 103, 14, 242, 136, 201, 174, 234, 156, 74, 69, 48]
+    ///             ].to_vec()
+    ///         ), 
+    ///         root
+    ///     );
+    /// ```
     fn next(&mut self) -> Option<LeMerkLevel<CIPHER_BLOCK_SIZE>> {
         let level_length = self.len();
         if level_length.checked_rem(2) == Some(1) {
@@ -60,7 +112,7 @@ impl<const CIPHER_BLOCK_SIZE: usize> Iterator for LeMerkLevel<CIPHER_BLOCK_SIZE>
                 (0..level_length.checked_div(2)?)
                     .map(|i| Index::from(i*2))
                     .map(|i| { 
-                        let left = self.get_cipher_block(i).unwrap(); /// TODO : make this unwrap infallible
+                        let left = self.get_cipher_block(i).unwrap(); // TODO : make this unwrap infallible
                         let right = self.get_cipher_block(i.incr()).unwrap();
                         let mut output = [0_u8; CIPHER_BLOCK_SIZE];
                         hash_visit::<sha3::Sha3_256>(&left,&right, &mut output);
@@ -80,6 +132,7 @@ impl<const CIPHER_BLOCK_SIZE: usize> Iterator for LeMerkLevel<CIPHER_BLOCK_SIZE>
 }
 
 /// Memory layout for a LeMerk Tree.
+/// The constructor of LeMerkTree is LeMerkBuilder. 
 #[derive(PartialEq, Debug)]
 pub struct LeMerkTree<const CIPHER_BLOCK_SIZE: usize> {
     /// Level's length of the Merkle Tree.
@@ -88,8 +141,12 @@ pub struct LeMerkTree<const CIPHER_BLOCK_SIZE: usize> {
     max_index: Index,
     /// A flatten representation of the whole tree.
     flat_hash_tree: LeMerkLevel<CIPHER_BLOCK_SIZE>,
+    /// Length of the data layer, i.e. leaves.
+    data_layer_length: usize
 }
 
+/// VirtualNode is a data structure designed to be used in the context of a LeMerkTree.
+/// A LeMerkTree will use this data structure to build the virtual paths to the data contained in the flatten hash tree.
 #[derive(Debug, PartialEq)]
 pub struct VirtualNode<const CIPHER_BLOCK_SIZE: usize> {
     /// data_hash: [u8; CIPHER_BLOCK_SIZE],
@@ -103,14 +160,12 @@ pub struct VirtualNode<const CIPHER_BLOCK_SIZE: usize> {
     right_successor: Option<Index>
 }
 
-/// VirtualNode is a data structure designed to be used in the context of a LeMerkTree.
-/// A LeMerkTree will use this data structure to build the virtual paths to the data contained in the flatten hash tree.
 impl<const CIPHER_BLOCK_SIZE: usize> VirtualNode<CIPHER_BLOCK_SIZE> {
     pub fn get_index(&self) -> Index {
         self.index
     }
     pub fn get_ancestor(&self) -> Result<Option<Index>, IndexError> {
-        if self.get_index() == Index::from(0) { return Ok(None) }; /// Index 0's ancestor is None.
+        if self.get_index() == Index::from(0) { return Ok(None) }; // Index 0's ancestor is None.
         let index = self.index.get_index();
         let be_ancestor = index
             .checked_sub(1).ok_or(IndexError::IndexBadSubstraction)?
@@ -188,7 +243,7 @@ impl<const CIPHER_BLOCK_SIZE: usize> LeMerkTree<CIPHER_BLOCK_SIZE> {
             };
         Ok(
             VirtualNode {
-                /// data_hash: self.flat_hash_tree.get_cipher_block(index)?,
+                // data_hash: self.flat_hash_tree.get_cipher_block(index)?,
                 index,
                 flat_tree_index,
                 ancestor,
@@ -535,7 +590,7 @@ fn examine_leaves_for_merkletree_depth_20() {
         )
         .map(
             |cipher_path| {
-                assert_eq!( /// all paths are initiated equal.
+                assert_eq!( // all paths are initiated equal.
                     cipher_path,
                     [[171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 171], [105, 159, 201, 79, 241, 236, 131, 241, 171, 245, 49, 3, 14, 50, 64, 3, 231, 117, 130, 152, 40, 22, 69, 36, 95, 124, 105, 132, 37, 165, 224, 231], [162, 66, 36, 51, 36, 74, 29, 162, 75, 60, 77, 177, 38, 220, 197, 147, 102, 111, 152, 54, 84, 3, 230, 170, 240, 127, 174, 1, 28, 130, 79, 9], [236, 70, 168, 219, 199, 251, 13, 165, 117, 59, 17, 243, 255, 4, 238, 107, 122, 42, 151, 155, 22, 128, 37, 212, 3, 148, 160, 255, 76, 242, 223, 89], [52, 250, 196, 184, 120, 29, 11, 129, 23, 70, 236, 69, 98, 54, 6, 244, 61, 241, 168, 185, 0, 159, 137, 197, 86, 78, 104, 2, 90, 111, 214, 4], [184, 177, 129, 15, 84, 196, 4, 137, 19, 9, 13, 120, 152, 55, 18, 189, 84, 205, 75, 174, 78, 35, 107, 225, 242, 148, 18, 35, 136, 171, 239, 107], [74, 1, 16, 67, 89, 76, 140, 2, 158, 198, 20, 25, 50, 197, 85, 185, 156, 70, 74, 183, 87, 52, 2, 122, 235, 150, 142, 216, 127, 213, 39, 92], [144, 2, 154, 203, 227, 37, 76, 99, 188, 157, 212, 168, 241, 228, 184, 226, 123, 68, 69, 187, 94, 90, 88, 151, 175, 146, 81, 236, 116, 79, 111, 104], [20, 137, 173, 94, 133, 206, 43, 108, 188, 207, 210, 242, 95, 141, 99, 209, 21, 255, 128, 25, 154, 251, 196, 236, 79, 111, 194, 72, 75, 248, 214, 144], [199, 149, 73, 74, 166, 98, 221, 1, 44, 93, 230, 197, 47, 10, 178, 142, 233, 19, 95, 232, 70, 7, 77, 98, 187, 120, 7, 207, 152, 116, 47, 217], [6, 132, 195, 134, 128, 128, 182, 236, 30, 89, 241, 70, 83, 117, 64, 179, 214, 48, 214, 19, 78, 179, 181, 24, 206, 83, 68, 184, 118, 10, 12, 178], [112, 5, 22, 23, 159, 4, 233, 224, 30, 189, 190, 41, 135, 230, 174, 184, 138, 212, 110, 223, 94, 234, 144, 48, 118, 239, 57, 50, 123, 165, 186, 139], [213, 173, 250, 186, 155, 60, 80, 24, 247, 210, 60, 212, 10, 236, 72, 190, 36, 236, 142, 167, 225, 248, 97, 3, 52, 144, 238, 53, 222, 84, 113, 110], [215, 217, 236, 242, 106, 206, 134, 76, 156, 5, 85, 70, 77, 50, 213, 30, 39, 104, 211, 78, 76, 122, 99, 84, 99, 5, 42, 5, 217, 30, 103, 32], [68, 173, 20, 144, 23, 157, 178, 132, 246, 250, 33, 216, 239, 251, 209, 186, 106, 48, 40, 4, 43, 150, 190, 155, 36, 159, 83, 141, 227, 245, 122, 133], [11, 121, 42, 233, 186, 63, 247, 200, 251, 140, 158, 71, 99, 38, 145, 147, 252, 24, 132, 29, 42, 102, 140, 64, 51, 236, 45, 140, 204, 109, 127, 88], [125, 200, 91, 118, 13, 230, 194, 25, 29, 82, 33, 109, 157, 220, 253, 209, 22, 164, 86, 216, 11, 195, 166, 39, 120, 59, 66, 24, 180, 197, 126, 167], [234, 147, 70, 82, 103, 201, 186, 242, 254, 236, 157, 228, 241, 85, 85, 172, 37, 4, 238, 212, 147, 144, 10, 192, 51, 187, 208, 168, 187, 52, 202, 99], [244, 96, 234, 249, 100, 250, 60, 212, 18, 150, 230, 14, 253, 191, 109, 215, 223, 84, 156, 120, 12, 63, 185, 67, 46, 23, 132, 168, 157, 248, 67, 2], [212, 73, 15, 77, 55, 76, 168, 164, 70, 133, 254, 148, 113, 197, 184, 219, 229, 140, 223, 253, 19, 211, 13, 154, 186, 21, 221, 41, 239, 185, 41, 48]]
                 );

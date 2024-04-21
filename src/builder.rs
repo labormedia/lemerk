@@ -58,6 +58,7 @@ impl<const BLOCK_SIZE: usize> LeMerkBuilder<BLOCK_SIZE> {
     pub fn try_build<D: sha3::Digest>(&self) -> Result<LeMerkTree<BLOCK_SIZE>, LeMerkBuilderError>{
         self.clone().is_valid?;
         let max_depth = self.max_depth;
+        let data_layer_length = 2_usize.checked_pow(max_depth as u32).ok_or(LeMerkBuilderError::BadPow)?;
         let hash_tree_data_length: Index = Index::try_from(DepthOffset::from((max_depth+1,0)))?;
         let max_index: Index = Index::from(hash_tree_data_length.get_index() - 1);
         let mut hash_tree_data: Vec<[u8; BLOCK_SIZE]> = vec![[0_u8;BLOCK_SIZE]; hash_tree_data_length.get_index() ];
@@ -82,6 +83,7 @@ impl<const BLOCK_SIZE: usize> LeMerkBuilder<BLOCK_SIZE> {
                 max_depth,
                 max_index,
                 flat_hash_tree,
+                data_layer_length,
             }
         )
     }
@@ -121,6 +123,7 @@ fn build_zero_merkletree() {
             max_depth: 0,
             max_index: Index::from(0),
             flat_hash_tree: LeMerkLevel::<SIZE>::from([[0_u8;SIZE]].to_vec()),
+            data_layer_length: 1,
         }
     );
 }
@@ -146,6 +149,7 @@ fn build_initial_value_merkletree() {
                     [105, 159, 201, 79, 241, 236, 131, 241, 171, 245, 49, 3, 14, 50, 64, 3, 231, 117, 130, 152, 40, 22, 69, 36, 95, 124, 105, 132, 37, 165, 224, 231]]
                 .to_vec()
             ),
+            data_layer_length: 2,
         }
     );
     assert_eq!(

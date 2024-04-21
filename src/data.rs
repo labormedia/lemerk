@@ -9,9 +9,6 @@ pub type CipherBlock = [u8;32];
 pub struct Index(usize);
 
 impl Index {
-    pub fn from(value: usize) -> Index {
-        Index(value)
-    }
     pub fn get_index(&self) -> usize {
         self.0
     }
@@ -66,7 +63,7 @@ impl Add for Index {
 
 impl From<usize> for Index {
     fn from(value:usize) -> Self {
-        Index::from(value)
+        Index(value)
     }
 }
 
@@ -92,7 +89,7 @@ impl TryFrom<Index> for DepthOffset {
     /// Unless value > 9223372036854775806.
     fn try_from(value: Index) -> Result<DepthOffset, Self::Error> {
         let value = value.get_index();
-        if value < 9223372036854775806 { /// The last possible level under usize precision is 63
+        if value < 9223372036854775806 { // The last possible level under usize precision is 63
             let mut i: u32 = 0;
             let mut acc: usize = 2_usize
                 .checked_pow(i+1).ok_or(IndexError::IndexBadPow)?
@@ -111,7 +108,7 @@ impl TryFrom<Index> for DepthOffset {
             Ok(DepthOffset::from((i as usize, value-prev)))
         } else if value == 9223372036854775807 {
             Ok(DepthOffset::from((63, 0)))
-        } else { /// For efficicency, boundary case for depth = 63 can be hardcoded. In this case, it will remain procedural with ilog(2).
+        } else { // For efficicency, boundary case for depth = 63 can be hardcoded. In this case, it will remain procedural with ilog(2).
             let closest_log2 = value.checked_ilog(2).ok_or(IndexError::IndexBadilog)?;
             let previous_layers_cardinality: usize = 2_usize
                 .checked_pow(closest_log2).ok_or(IndexError::IndexBadPow)?
