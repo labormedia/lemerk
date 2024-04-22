@@ -98,7 +98,7 @@ fn hex_representation() {
 #[test]
 fn builder_initial_block() {
     const SIZE: usize = 32;
-    let mut builder: LeMerkBuilder<SIZE> = LeMerkBuilder::<SIZE>::new();
+    let builder: LeMerkBuilder<SIZE> = LeMerkBuilder::<SIZE>::new();
     let tree: LeMerkBuilder<SIZE> = builder
         .with_max_depth(3)
         .with_initial_block([1_u8;SIZE]);
@@ -111,7 +111,7 @@ fn builder_initial_block() {
 #[test]
 fn build_zero_merkletree() {
     const SIZE: usize = 32;
-    let mut builder: LeMerkBuilder<SIZE> = LeMerkBuilder::<SIZE>::new();
+    let builder: LeMerkBuilder<SIZE> = LeMerkBuilder::<SIZE>::new();
     let tree: LeMerkTree<SIZE> = builder
         .with_max_depth(0)
         .with_initial_block([0_u8;SIZE])
@@ -131,7 +131,7 @@ fn build_zero_merkletree() {
 #[test]
 fn build_initial_value_merkletree() {
     const SIZE: usize = 32;
-    let mut builder: LeMerkBuilder<SIZE> = LeMerkBuilder::<SIZE>::new();
+    let builder: LeMerkBuilder<SIZE> = LeMerkBuilder::<SIZE>::new();
     let tree: LeMerkTree<SIZE> = builder
         .with_max_depth(1)
         .with_initial_block(hex!("abababababababababababababababababababababababababababababababab"))
@@ -161,7 +161,7 @@ fn build_initial_value_merkletree() {
 #[test]
 fn build_merkletree_depth_20() {
     const SIZE: usize = 32;
-    let mut builder: LeMerkBuilder<SIZE> = LeMerkBuilder::<SIZE>::new();
+    let builder: LeMerkBuilder<SIZE> = LeMerkBuilder::<SIZE>::new();
     let tree: LeMerkTree<SIZE> = builder
         .with_depth_length(20)
         .with_initial_block(hex!("abababababababababababababababababababababababababababababababab"))

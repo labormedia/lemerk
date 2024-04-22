@@ -1,4 +1,26 @@
 ///! LeMerk is a custom Merkle Tree implemention.
+///! Example usage:
+///```
+///    use hex_literal::hex;
+///    use lemerk::LeMerkTree;
+///    use lemerk::builder::LeMerkBuilder;
+///
+///    const SIZE: usize = 32;
+///    let max_depth = 19;
+///    let mut builder: LeMerkBuilder<SIZE> = LeMerkBuilder::<SIZE>::new();
+///    let custom_block = hex!("abababababababababababababababababababababababababababababababab");
+///    let different_custom_block = hex!("ababababababaffbabababababababababababababababababababababababab");
+///    let mut tree: LeMerkTree<SIZE> = builder
+///        .with_max_depth(max_depth)
+///        .with_initial_block(custom_block)  // A custom block.
+///        .try_build::<sha3::Sha3_256>()
+///        .expect("Unexpected build.");
+///    let original_root_data = tree.get_root_data();
+///    let leaves = tree.get_leaves_indexes();
+
+///    let leaf_index = leaves[0];
+///    let (updated_root, updated_proof) = tree.set_update_generate_proof(leaf_index, different_custom_block).unwrap();
+///```
 use sha3;
 use hex_literal::hex;
 use core::iter::Iterator;
@@ -469,8 +491,8 @@ fn next_level_depth_2() {
 #[test]
 fn merkletree_depth_20_levels_0_1() {
     const SIZE: usize = 32;
-    let mut builder: builder::LeMerkBuilder<SIZE> = builder::LeMerkBuilder::<SIZE>::new();
-    let mut tree: LeMerkTree<SIZE> = builder
+    let builder: builder::LeMerkBuilder<SIZE> = builder::LeMerkBuilder::<SIZE>::new();
+    let tree: LeMerkTree<SIZE> = builder
         .with_depth_length(20)
         .with_initial_block(hex!("abababababababababababababababababababababababababababababababab"))
         .try_build::<sha3::Sha3_256>()
@@ -485,7 +507,7 @@ fn merkletree_depth_20_levels_0_1() {
         level_0.get_cipher_block_mut_ref(Index::from(0)).unwrap(),
         &mut hex!("d4490f4d374ca8a44685fe9471c5b8dbe58cdffd13d30d9aba15dd29efb92930"),
     );
-    let mut level_1 = tree.get_level_by_depth_index(1).unwrap();
+    let level_1 = tree.get_level_by_depth_index(1).unwrap();
     assert_eq!(level_1.len(), 2);
     let left = level_1.get_cipher_block(Index::from(0)).unwrap();
     let right = level_1.get_cipher_block(Index::from(1)).unwrap();
@@ -511,14 +533,14 @@ fn get_last_and_pre_last_levels_from_tree_depth_20() {
     let tree_depth_length = 20;
     let last_level_depth_index = 19;
     let pre_last_level_depth_index = 18;
-    let mut builder: builder::LeMerkBuilder<SIZE> = builder::LeMerkBuilder::<SIZE>::new();
-    let mut tree: LeMerkTree<SIZE> = builder
+    let builder: builder::LeMerkBuilder<SIZE> = builder::LeMerkBuilder::<SIZE>::new();
+    let tree: LeMerkTree<SIZE> = builder
         .with_depth_length(tree_depth_length)
         .with_initial_block(hex!("abababababababababababababababababababababababababababababababab"))
         .try_build::<sha3::Sha3_256>()
         .expect("Unexpected build.");
-    let mut pre_last_level = tree.get_level_by_depth_index(pre_last_level_depth_index).unwrap();
-    let mut last_level = tree.get_level_by_depth_index(last_level_depth_index).unwrap();  /// Max depth index for a LeMerkTree of depth length K is (K - 1).
+    let pre_last_level = tree.get_level_by_depth_index(pre_last_level_depth_index).unwrap();
+    let last_level = tree.get_level_by_depth_index(last_level_depth_index).unwrap();  // Max depth index for a LeMerkTree of depth length K is (K - 1).
     assert_eq!(
         pre_last_level.len(),
         2_usize.pow(pre_last_level_depth_index as u32)
@@ -577,7 +599,7 @@ fn examine_virtual_nodes_for_tree_depth_length_28() {
             }
         );
     
-    {   /// tests for node 0;
+    {   // tests for node 0;
         let virtual_node = tree.get_virtual_node_by_index(Index::from(0)).unwrap();
         assert_eq!(virtual_node.get_ancestor_index(), Ok(None));
         let (left_successor_index, right_successor_index) = virtual_node.get_successors_indexes();
@@ -609,8 +631,8 @@ fn leaf_of_one_node_tree() {
 fn building_tree_length_0_should_panic() {
     let tree_depth_length = 0;
     const SIZE: usize = 32;
-    let mut builder: builder::LeMerkBuilder<SIZE> = builder::LeMerkBuilder::<SIZE>::new();
-    let mut tree: LeMerkTree<SIZE> = builder
+    let builder: builder::LeMerkBuilder<SIZE> = builder::LeMerkBuilder::<SIZE>::new();
+    let tree: LeMerkTree<SIZE> = builder
         .with_depth_length(tree_depth_length)
         .with_initial_block([0_u8; SIZE])
         .try_build::<sha3::Sha3_256>()
@@ -621,8 +643,8 @@ fn building_tree_length_0_should_panic() {
 fn building_tree_length_1_has_one_leaf() {
     let tree_depth_length = 1;
     const SIZE: usize = 32;
-    let mut builder: builder::LeMerkBuilder<SIZE> = builder::LeMerkBuilder::<SIZE>::new();
-    let mut tree: LeMerkTree<SIZE> = builder
+    let builder: builder::LeMerkBuilder<SIZE> = builder::LeMerkBuilder::<SIZE>::new();
+    let tree: LeMerkTree<SIZE> = builder
         .with_depth_length(tree_depth_length)
         .with_initial_block([0_u8; SIZE])
         .try_build::<sha3::Sha3_256>()
@@ -636,8 +658,8 @@ fn building_tree_length_1_has_one_leaf() {
 fn building_tree_length_2_has_three_leaves() {
     let tree_depth_length = 2;
     const SIZE: usize = 32;
-    let mut builder: builder::LeMerkBuilder<SIZE> = builder::LeMerkBuilder::<SIZE>::new();
-    let mut tree: LeMerkTree<SIZE> = builder
+    let builder: builder::LeMerkBuilder<SIZE> = builder::LeMerkBuilder::<SIZE>::new();
+    let tree: LeMerkTree<SIZE> = builder
         .with_depth_length(tree_depth_length)
         .with_initial_block([0_u8; SIZE])
         .try_build::<sha3::Sha3_256>()
@@ -651,22 +673,22 @@ fn building_tree_length_2_has_three_leaves() {
 fn examine_leaves_for_merkletree_depth_20() {
     const SIZE: usize = 32;
     let max_depth = 19;
-    let mut builder: builder::LeMerkBuilder<SIZE> = builder::LeMerkBuilder::<SIZE>::new();
+    let builder: builder::LeMerkBuilder<SIZE> = builder::LeMerkBuilder::<SIZE>::new();
     let custom_block = hex!("abababababababababababababababababababababababababababababababab");
     let different_custom_block = hex!("ababababababaffbabababababababababababababababababababababababab");
-    let mut tree: LeMerkTree<SIZE> = builder
+    let tree: LeMerkTree<SIZE> = builder
         .with_max_depth(max_depth)
         .with_initial_block(custom_block)  // A custom block.
         .try_build::<sha3::Sha3_256>()
         .expect("Unexpected build.");
     let leaves = tree.get_leaves_indexes();
-    assert_eq!(leaves.len(), 2_usize.pow(max_depth as u32)); /// size of leaves layer is 2_usize.pow(max_depth as u32).
+    assert_eq!(leaves.len(), 2_usize.pow(max_depth as u32)); // size of leaves layer is 2_usize.pow(max_depth as u32).
     let paths: Vec<Vec<Index>> = leaves.into_iter()
         .map(
             |index| {
-                /// Checks all leaves conform to the initial value and not to a different value.
+                // Checks all leaves conform to the initial value and not to a different value.
                 let cipher_block = tree.get_cipher_block_by_index(index).unwrap();
-                assert_eq!(cipher_block, custom_block);  /// Test against a custom block.
+                assert_eq!(cipher_block, custom_block);  // Test against a custom block.
                 assert_ne!(cipher_block, different_custom_block);
                 index
             }
@@ -683,7 +705,7 @@ fn examine_leaves_for_merkletree_depth_20() {
         (acc.0 && path != acc.1, path)
     }).0;
     assert!(are_different);
-    paths.into_iter()
+    let _ = paths.into_iter()
         .map(
             |path| {
                 path.into_iter()
@@ -715,10 +737,10 @@ fn examine_leaves_for_merkletree_depth_20() {
 fn verify_paths_for_merkletree_depth_20() {
     const SIZE: usize = 32;
     let max_depth = 19;
-    let mut builder: builder::LeMerkBuilder<SIZE> = builder::LeMerkBuilder::<SIZE>::new();
+    let builder: builder::LeMerkBuilder<SIZE> = builder::LeMerkBuilder::<SIZE>::new();
     let custom_block = hex!("abababababababababababababababababababababababababababababababab");
     let different_custom_block = hex!("ababababababaffbabababababababababababababababababababababababab");
-    let mut tree: LeMerkTree<SIZE> = builder
+    let tree: LeMerkTree<SIZE> = builder
         .with_max_depth(max_depth)
         .with_initial_block(custom_block)  // A custom block.
         .try_build::<sha3::Sha3_256>()
@@ -739,7 +761,7 @@ fn verify_paths_for_merkletree_depth_20() {
 fn set_and_update_merkletree_depth_20() {
     const SIZE: usize = 32;
     let max_depth = 19;
-    let mut builder: builder::LeMerkBuilder<SIZE> = builder::LeMerkBuilder::<SIZE>::new();
+    let builder: builder::LeMerkBuilder<SIZE> = builder::LeMerkBuilder::<SIZE>::new();
     let custom_block = hex!("abababababababababababababababababababababababababababababababab");
     let different_custom_block = hex!("ababababababaffbabababababababababababababababababababababababab");
     let mut tree: LeMerkTree<SIZE> = builder
@@ -766,7 +788,7 @@ fn set_and_update_merkletree_depth_20() {
 fn set_and_update_last_15_merkletree_depth_20() {
     const SIZE: usize = 32;
     let max_depth = 19;
-    let mut builder: builder::LeMerkBuilder<SIZE> = builder::LeMerkBuilder::<SIZE>::new();
+    let builder: builder::LeMerkBuilder<SIZE> = builder::LeMerkBuilder::<SIZE>::new();
     let custom_block = hex!("abababababababababababababababababababababababababababababababab");
     let different_custom_block = hex!("ababababababaffbabababababababababababababababababababababababab");
     let mut tree: LeMerkTree<SIZE> = builder
@@ -781,7 +803,7 @@ fn set_and_update_last_15_merkletree_depth_20() {
         .take(15)
         .for_each(
             |x| {
-                tree.set_and_update(x, different_custom_block);
+                let _ = tree.set_and_update(x, different_custom_block);
                 let verified = tree.verify_path_to_root_by_index(x).unwrap();
                 assert_eq!(verified, tree.get_root_data().unwrap())
             }
@@ -793,7 +815,7 @@ fn set_and_update_last_15_merkletree_depth_20() {
 fn set_verify_merkletree_depth_20() {
     const SIZE: usize = 32;
     let max_depth = 19;
-    let mut builder: builder::LeMerkBuilder<SIZE> = builder::LeMerkBuilder::<SIZE>::new();
+    let builder: builder::LeMerkBuilder<SIZE> = builder::LeMerkBuilder::<SIZE>::new();
     let custom_block = hex!("abababababababababababababababababababababababababababababababab");
     let different_custom_block = hex!("ababababababaffbabababababababababababababababababababababababab");
     let mut tree: LeMerkTree<SIZE> = builder
