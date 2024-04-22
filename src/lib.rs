@@ -326,6 +326,8 @@ impl<const CIPHER_BLOCK_SIZE: usize> LeMerkTree<CIPHER_BLOCK_SIZE> {
         };
         Ok(self.get_root_data()?)
     }
+    /// This method sets a leaf by its index with the block data provided.
+    /// It returns the root update.
     pub fn set_and_update(&mut self, index: Index, block: [u8; CIPHER_BLOCK_SIZE]) -> Result<[u8; CIPHER_BLOCK_SIZE], LeMerkTreeError> {
         let mut virtual_node = self.get_virtual_node_by_index(index)?;
         let flat_tree_index_to_update = virtual_node.get_flat_tree_index();
@@ -350,7 +352,58 @@ impl<const CIPHER_BLOCK_SIZE: usize> LeMerkTree<CIPHER_BLOCK_SIZE> {
                 *self.flat_hash_tree.get_cipher_block_mut_ref(ancestor_flat_tree_index.into())? = result;
                 virtual_node = self.get_virtual_node_by_index(ancestor_index)?;
             };
-            Ok(self.get_root_data()?)
+            Ok(self.flat_hash_tree.get_cipher_block(virtual_node.get_flat_tree_index().into())?)
+        }
+    }
+    pub fn set_update_generate_proof(&mut self, index: Index, block: [u8; CIPHER_BLOCK_SIZE]) -> Result<([u8; CIPHER_BLOCK_SIZE], Vec<[u8; CIPHER_BLOCK_SIZE]>), LeMerkTreeError> {
+        let mut virtual_node = self.get_virtual_node_by_index(index)?;
+        let flat_tree_index_to_update = virtual_node.get_flat_tree_index();
+        let mut proof = Vec::new();
+        if flat_tree_index_to_update >= self.get_data_layer_length() {
+            Err(LeMerkTreeError::OutOfBounds)
+        } else {
+            *self.flat_hash_tree.get_cipher_block_mut_ref(flat_tree_index_to_update.into())? = block;
+            let mut result = self.get_cipher_block_by_index(index)?.clone();
+            while let Some(ancestor_index) = virtual_node.get_ancestor_index()? {
+                let virtual_node_flat_tree_index = virtual_node.get_flat_tree_index();
+                let pair_to_ancestor_flat_tree_index = self.get_virtual_node_by_index(
+                        virtual_node.get_pair_index_to_ancestor()?.ok_or(LeMerkTreeError::IsNone)?
+                    )?.get_flat_tree_index();
+                let ancestor_virtual_node = self.get_virtual_node_by_index(ancestor_index)?;
+                let ancestor_flat_tree_index = ancestor_virtual_node.get_flat_tree_index();
+                let node_a = self.flat_hash_tree.get_cipher_block(virtual_node_flat_tree_index.into())?;
+                let node_b = self.flat_hash_tree.get_cipher_block(pair_to_ancestor_flat_tree_index.into())?;
+                hash_visit::<sha3::Sha3_256>(
+                    &node_a,
+                    &node_b,
+                    &mut result
+                );
+                proof.push(node_b);
+                *self.flat_hash_tree.get_cipher_block_mut_ref(ancestor_flat_tree_index.into())? = result;
+                virtual_node = self.get_virtual_node_by_index(ancestor_index)?;
+            };
+            Ok((self.flat_hash_tree.get_cipher_block(virtual_node.get_flat_tree_index().into())?, proof))
+        }
+    }
+    /// Generates a proof from a node index corresponding to a leaf in a LeMerkTree.
+    /// A proof is defined a a tuple of a root and a collection of data blocks.
+    /// For every given state of a LeMerkTree, there's a unique proof for every leaf in the tree.
+    pub fn generate_proof(&mut self, index: Index) -> Result<([u8; CIPHER_BLOCK_SIZE], Vec<[u8; CIPHER_BLOCK_SIZE]>), LeMerkTreeError> {
+        let mut virtual_node = self.get_virtual_node_by_index(index)?;
+        let flat_tree_index_to_update = virtual_node.get_flat_tree_index();
+        if flat_tree_index_to_update >= self.get_data_layer_length() {
+            Err(LeMerkTreeError::OutOfBounds)
+        } else {
+            let mut proof = Vec::new();
+            while let Some(ancestor_index) = virtual_node.get_ancestor_index()? {
+                let pair_to_ancestor_flat_tree_index = self.get_virtual_node_by_index(
+                        virtual_node.get_pair_index_to_ancestor()?.ok_or(LeMerkTreeError::IsNone)?
+                    )?.get_flat_tree_index();
+                let pair_node_to_ancestor_data = self.flat_hash_tree.get_cipher_block(pair_to_ancestor_flat_tree_index.into())?;
+                proof.push(pair_node_to_ancestor_data);
+                virtual_node = self.get_virtual_node_by_index(ancestor_index)?;
+            }
+            Ok((self.flat_hash_tree.get_cipher_block(virtual_node.get_flat_tree_index().into())?, proof))
         }
     }
     pub fn get_cipher_block_by_index(&self, index: Index) -> Result<[u8; CIPHER_BLOCK_SIZE], LeMerkTreeError> {
@@ -700,11 +753,83 @@ fn set_and_update_merkletree_depth_20() {
         .take(15)
         .for_each(
             |x| {
+                let updated_root = tree.set_and_update(x, different_custom_block).unwrap();
+                let verified = tree.verify_path_to_root_by_index(x).unwrap();
+                assert_eq!(verified, tree.get_root_data().unwrap());
+                assert_eq!(verified, updated_root);
+            }
+        );
+    assert_ne!(tree.get_root_data(), original_root_data);
+}
+
+#[test]
+fn set_and_update_last_15_merkletree_depth_20() {
+    const SIZE: usize = 32;
+    let max_depth = 19;
+    let mut builder: builder::LeMerkBuilder<SIZE> = builder::LeMerkBuilder::<SIZE>::new();
+    let custom_block = hex!("abababababababababababababababababababababababababababababababab");
+    let different_custom_block = hex!("ababababababaffbabababababababababababababababababababababababab");
+    let mut tree: LeMerkTree<SIZE> = builder
+        .with_max_depth(max_depth)
+        .with_initial_block(custom_block)  // A custom block.
+        .try_build::<sha3::Sha3_256>()
+        .expect("Unexpected build.");
+    let original_root_data = tree.get_root_data();
+    let leaves = tree.get_leaves_indexes();
+    leaves.into_iter()
+        .rev()
+        .take(15)
+        .for_each(
+            |x| {
                 tree.set_and_update(x, different_custom_block);
                 let verified = tree.verify_path_to_root_by_index(x).unwrap();
                 assert_eq!(verified, tree.get_root_data().unwrap())
             }
         );
     assert_ne!(tree.get_root_data(), original_root_data);
+}
 
+#[test]
+fn set_verify_merkletree_depth_20() {
+    const SIZE: usize = 32;
+    let max_depth = 19;
+    let mut builder: builder::LeMerkBuilder<SIZE> = builder::LeMerkBuilder::<SIZE>::new();
+    let custom_block = hex!("abababababababababababababababababababababababababababababababab");
+    let different_custom_block = hex!("ababababababaffbabababababababababababababababababababababababab");
+    let mut tree: LeMerkTree<SIZE> = builder
+        .with_max_depth(max_depth)
+        .with_initial_block(custom_block)  // A custom block.
+        .try_build::<sha3::Sha3_256>()
+        .expect("Unexpected build.");
+    let original_root_data = tree.get_root_data();
+    let leaves = tree.get_leaves_indexes();
+    leaves.into_iter()
+        .take(15)
+        .for_each(
+            |x| {
+                let mut virtual_node = tree.get_virtual_node_by_index(x).unwrap();
+                let (updated_root, updated_proof) = tree.set_update_generate_proof(x, different_custom_block).unwrap();
+                let (new_root, proof) = tree.generate_proof(x).unwrap();
+                assert_eq!(updated_proof, proof);
+                assert_eq!(updated_root, new_root);
+                let mut i = 0;
+                let mut visited = tree.get_cipher_block_by_index(x).unwrap();
+                for node in proof {
+                    if let Some(ancestor_index) = virtual_node.get_ancestor_index().unwrap() {
+                        let ancestor_data = tree.get_cipher_block_by_index(ancestor_index).unwrap();
+                        let mut output = [0_u8; SIZE];
+                        hash_visit::<sha3::Sha3_256>(&visited, &node, &mut output);
+                        assert_eq!(ancestor_data, output);
+                        visited = output;
+                        virtual_node = tree.get_virtual_node_by_index(ancestor_index).unwrap();
+                        i+=1;
+                    } else {
+                        assert_eq!(visited, tree.get_root_data().unwrap());
+                    };
+                }
+                let verified = tree.verify_path_to_root_by_index(x).unwrap();
+                assert_eq!(verified, tree.get_root_data().unwrap());
+            }
+        );
+    assert_ne!(tree.get_root_data(), original_root_data);
 }
