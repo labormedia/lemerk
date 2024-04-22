@@ -10,7 +10,9 @@ pub enum LeMerkTreeError {
     BadMultiplication,
     BadAddition,
     BadSubstraction,
+    BadRemainder,
     BadPow,
+    Badilog,
     IsNone,
     OutOfBounds,
 }
@@ -29,6 +31,10 @@ impl From<IndexError> for LeMerkTreeError {
             IndexError::IndexBadDivision => LeMerkTreeError::BadDivision,
             IndexError::IndexBadMultiplication => LeMerkTreeError::BadMultiplication,
             IndexError::IndexBadAddition => LeMerkTreeError::BadAddition,
+            IndexError::IndexBadSubstraction => LeMerkTreeError::BadSubstraction,
+            IndexError::IndexBadRemainder => LeMerkTreeError::BadRemainder,
+            IndexError::IndexBadPow => LeMerkTreeError::BadPow,
+            IndexError::IndexBadilog => LeMerkTreeError::Badilog,
             _ => panic!("Unexpected error"),
         }
     }
