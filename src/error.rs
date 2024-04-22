@@ -15,6 +15,7 @@ pub enum LeMerkTreeError {
     Badilog,
     IsNone,
     OutOfBounds,
+    RuleUnmet,
 }
 
 pub enum VirtualNodeError {
