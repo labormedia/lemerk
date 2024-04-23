@@ -20,7 +20,10 @@
 
 ///    let leaf_index = leaves[0];
 ///    let (updated_root, updated_proof) = tree.set_update_generate_proof(leaf_index, different_custom_block).unwrap();
-///    assert_ne!(original_root_data, updated_root);
+///    let new_root = tree.verify_proof(leaf_index, updated_proof).unwrap().unwrap();
+///    assert_eq!(new_root, tree.get_root_data().unwrap());
+///    assert_eq!(new_root, updated_root);
+///    assert_ne!(new_root, original_root_data);
 ///    
 ///```
 use sha3;
@@ -430,27 +433,27 @@ impl<const CIPHER_BLOCK_SIZE: usize> LeMerkTree<CIPHER_BLOCK_SIZE> {
             Ok((self.flat_hash_tree.get_cipher_block(virtual_node.get_flat_tree_index().into())?, proof))
         }
     }
-    pub fn verify_proof(&self, index: Index, proof: ([u8; CIPHER_BLOCK_SIZE], Vec<[u8; CIPHER_BLOCK_SIZE]>)) -> Result<bool, LeMerkTreeError> {
-        let cipher_block = self.get_cipher_block_by_index(index)?;
-        let mut virtual_node = self.get_virtual_node_by_index(index)?;
-        let (hash_root, hash_set) = proof;
-        let mut visited = self.get_cipher_block_by_index(index)?;
-        for hash in hash_set {
-            if let Some(ancestor_index) = virtual_node.get_ancestor_index()? {
-                let ancestor_data = self.get_cipher_block_by_index(ancestor_index)?;
-                let mut output = [0_u8; CIPHER_BLOCK_SIZE];
-                hash_visit::<sha3::Sha3_256>(&visited, &hash, &mut output);
-                if ancestor_data != output {
-                    return Ok(false);
-                };
-                visited = output;
-                virtual_node = self.get_virtual_node_by_index(ancestor_index)?;
+    pub fn verify_proof(&self, index: Index, proof: Vec<[u8; CIPHER_BLOCK_SIZE]>) -> Result<Option<[u8; CIPHER_BLOCK_SIZE]>, LeMerkTreeError> {
+        if proof.len() <= self.get_max_depth() {
+            let cipher_block = self.get_cipher_block_by_index(index)?;
+            let mut virtual_node = self.get_virtual_node_by_index(index)?;
+            let hash_set = proof;
+            let mut visited = self.get_cipher_block_by_index(index)?;
+            for hash in hash_set {
+                if let Some(ancestor_index) = virtual_node.get_ancestor_index()? {
+                    let ancestor_data = self.get_cipher_block_by_index(ancestor_index)?;
+                    let mut output = [0_u8; CIPHER_BLOCK_SIZE];
+                    hash_visit::<sha3::Sha3_256>(&visited, &hash, &mut output);
+                    if ancestor_data != output {
+                        return Ok(None);
+                    };
+                    visited = output;
+                    virtual_node = self.get_virtual_node_by_index(ancestor_index)?;
+                }
             }
-        }
-        if visited == self.get_root_data()? {
-            Ok(true)
+            Ok(Some(visited))
         } else {
-            Ok(false)
+            Ok(None)
         }
     }
     pub fn get_cipher_block_by_index(&self, index: Index) -> Result<[u8; CIPHER_BLOCK_SIZE], LeMerkTreeError> {
