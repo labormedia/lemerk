@@ -1,11 +1,13 @@
 use sha3::Digest;
 
+/// Copies the hash of data to output.
 pub fn data_hash<D: Digest>(data: &[u8], output: &mut [u8]) {
     let mut hasher = D::new();
     hasher.update(data);
     output.copy_from_slice(&hasher.finalize());
 }
 
+/// Copies the hash of concatenated left || right to output.
 pub fn hash_visit<D: Digest>(left: &[u8], right: &[u8], output: &mut [u8]) {
     let mut hasher = D::new();
     hasher.update(left);

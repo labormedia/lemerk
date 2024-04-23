@@ -32,6 +32,11 @@ The constructor for LeMerkTree is LeMerkBuilder:
     
 ```
 
+## Docs
+```
+cargo doc --release
+```
+
 ## Tests
 ```
 cargo test --release
