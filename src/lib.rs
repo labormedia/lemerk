@@ -839,7 +839,7 @@ fn set_and_update_last_15_merkletree_depth_20() {
     assert_ne!(tree.get_root_data(), original_root_data);
 }
 
-//#[test]
+#[test]
 fn set_verify_merkletree_depth_20() {
     const SIZE: usize = 32;
     let max_depth = 19;
@@ -854,7 +854,7 @@ fn set_verify_merkletree_depth_20() {
     let original_root_data = tree.get_root_data();
     let leaves = tree.get_leaves_indexes();
     leaves.into_iter()
-        .take(15)
+        // .take(15)
         .for_each(
             |x| {
                 let mut virtual_node = tree.get_virtual_node_by_index(x).unwrap();
