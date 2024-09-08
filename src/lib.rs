@@ -74,6 +74,9 @@ impl<const CIPHER_BLOCK_SIZE: usize> LeMerkLevel<CIPHER_BLOCK_SIZE> {
     pub fn len(&self) -> usize {
         self.0.len()
     }
+    pub fn is_empty(&self) -> bool {
+        self.0.len() == 0
+    }
 }
 
 /// The Iterator implementation maps the LeMerkLevel's hash_visit pair combinations to its next depth level closer to root, if not root.
@@ -221,18 +224,10 @@ impl<const CIPHER_BLOCK_SIZE: usize> VirtualNode<CIPHER_BLOCK_SIZE> {
     }
     pub fn is_sucessor(&self, other: &VirtualNode<CIPHER_BLOCK_SIZE>) -> bool {
         let (left, right) = self.get_successors_indexes();
-        if left == Some(other.get_index()) || right == Some(other.get_index()) {
-            true
-        } else {
-            false
-        }
+        left == Some(other.get_index()) || right == Some(other.get_index())
     }
     pub fn is_ancestor(&self, other: &VirtualNode<CIPHER_BLOCK_SIZE>) -> bool {
-        if Ok(Some(other.get_index())) == self.get_ancestor_index() {
-            true
-        } else {
-            false
-        }
+        Ok(Some(other.get_index())) == self.get_ancestor_index()
     }
 }
 
@@ -333,7 +328,7 @@ impl<const CIPHER_BLOCK_SIZE: usize> LeMerkTree<CIPHER_BLOCK_SIZE> {
         Ok(result)
     }
     pub fn verify_path_to_root_by_index(&self, index: Index) -> Result<[u8; CIPHER_BLOCK_SIZE], LeMerkTreeError> {
-        let mut result = self.get_cipher_block_by_index(index)?.clone();
+        let mut result = self.get_cipher_block_by_index(index)?;
         let mut virtual_node = self.get_virtual_node_by_index(index)?;
         while let Some(ancestor_index) = virtual_node.get_ancestor_index()? {
             let virtual_node_flat_tree_index = virtual_node.get_flat_tree_index();
@@ -351,7 +346,7 @@ impl<const CIPHER_BLOCK_SIZE: usize> LeMerkTree<CIPHER_BLOCK_SIZE> {
             assert_eq!(self.flat_hash_tree.get_cipher_block(ancestor_flat_tree_index.into())?, result);
             virtual_node = self.get_virtual_node_by_index(ancestor_index)?;
         };
-        Ok(self.get_root_data()?)
+        self.get_root_data()
     }
     /// This method sets a leaf by its index with the block data provided.
     /// It returns the root update.
@@ -362,7 +357,7 @@ impl<const CIPHER_BLOCK_SIZE: usize> LeMerkTree<CIPHER_BLOCK_SIZE> {
             Err(LeMerkTreeError::OutOfBounds)
         } else {
             *self.flat_hash_tree.get_cipher_block_mut_ref(flat_tree_index_to_update.into())? = block;
-            let mut result = self.get_cipher_block_by_index(index)?.clone();
+            let mut result = self.get_cipher_block_by_index(index)?;
             while let Some(ancestor_index) = virtual_node.get_ancestor_index()? {
                 let virtual_node_flat_tree_index = virtual_node.get_flat_tree_index();
                 let pair_to_ancestor_flat_tree_index = self.get_virtual_node_by_index(
@@ -390,7 +385,7 @@ impl<const CIPHER_BLOCK_SIZE: usize> LeMerkTree<CIPHER_BLOCK_SIZE> {
             Err(LeMerkTreeError::OutOfBounds)
         } else {
             *self.flat_hash_tree.get_cipher_block_mut_ref(flat_tree_index_to_update.into())? = block;
-            let mut result = self.get_cipher_block_by_index(index)?.clone();
+            let mut result = self.get_cipher_block_by_index(index)?;
             while let Some(ancestor_index) = virtual_node.get_ancestor_index()? {
                 let virtual_node_flat_tree_index = virtual_node.get_flat_tree_index();
                 let pair_to_ancestor_flat_tree_index = self.get_virtual_node_by_index(
