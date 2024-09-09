@@ -1,5 +1,7 @@
 use sha3;
 use hex_literal::hex;
+use alloc::vec;
+use alloc::vec::Vec;
 use crate::{
     LeMerkTree,
     LeMerkLevel,
@@ -68,7 +70,7 @@ impl<const BLOCK_SIZE: usize> LeMerkBuilder<BLOCK_SIZE> {
         while depth_index > 0 {
             depth_index -= 1;
             let allocation_size = 2_usize.checked_pow(depth_index as u32).ok_or(LeMerkBuilderError::BadPow)?;
-            let allocating_block = allocating_block_buffer.clone();
+            let allocating_block = allocating_block_buffer;
             let _: Vec<_> = (0..allocation_size)
                 .map(|i| { 
                     hash_tree_data[i + initial_index]= allocating_block;

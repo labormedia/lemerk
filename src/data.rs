@@ -1,4 +1,6 @@
 use core::ops::Add;
+use alloc::vec;
+use alloc::vec::Vec;
 use crate::{
     error::IndexError,
     traits::SizedTree,
@@ -29,7 +31,7 @@ impl Index {
         if self.get_index() > max_index {
             None
         } else {
-            let depth_offset = DepthOffset::try_from(self.clone()).ok()?;
+            let depth_offset = DepthOffset::try_from(*self).ok()?;
             let depth = depth_offset.get_depth();
             let offset = depth_offset.get_offset();
             let max_depth = tree.get_max_depth();
