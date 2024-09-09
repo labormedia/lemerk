@@ -26,9 +26,13 @@
 //!    assert_ne!(new_root, original_root_data);
 //!    
 //!```
+#![no_std]
+extern crate alloc;
 use sha3;
 use hex_literal::hex;
 use core::iter::Iterator;
+use alloc::vec;
+use alloc::vec::Vec;
 /// Crypto helpers.
 pub mod crypto;
 use crypto::hash_visit;

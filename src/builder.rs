@@ -1,5 +1,7 @@
 use sha3;
 use hex_literal::hex;
+use alloc::vec;
+use alloc::vec::Vec;
 use crate::{
     LeMerkTree,
     LeMerkLevel,

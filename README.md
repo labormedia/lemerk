@@ -1,5 +1,5 @@
 # LeMerk
-## A custom Merkle Tree Implementation built on Rust.
+## A custom no_std Merkle Tree Implementation built on Rust.
 
 ## Example usage
 
@@ -37,7 +37,7 @@ The constructor for LeMerkTree is LeMerkBuilder:
 cargo doc --release
 ```
 
-## Tests
+## Tests - It is recommended to run tests optimized in release mode.
 ```
 cargo test --release
 ```
