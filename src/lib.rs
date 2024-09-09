@@ -780,7 +780,7 @@ fn verify_paths_for_merkletree_depth_20() {
 
 }
 
-//#[test]
+#[test]
 fn set_and_update_merkletree_depth_20() {
     const SIZE: usize = 32;
     let max_depth = 19;
@@ -807,7 +807,7 @@ fn set_and_update_merkletree_depth_20() {
     assert_ne!(tree.get_root_data(), original_root_data);
 }
 
-//#[test]
+#[test]
 fn set_and_update_last_15_merkletree_depth_20() {
     const SIZE: usize = 32;
     let max_depth = 19;
